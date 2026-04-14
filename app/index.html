@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Application de gestion pour association sportive — membres, planning, finances et statistiques.">
+    <title>SportFlow — Gestion Association Sportive</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <span class="logo-icon material-icons-round">sports_soccer</span>
+                <span class="logo-text">SportFlow</span>
+            </div>
+            <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+                <span class="material-icons-round">menu</span>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <ul>
+                <li>
+                    <a href="#" class="nav-link active" data-page="dashboard" id="nav-dashboard">
+                        <span class="material-icons-round">dashboard</span>
+                        <span class="nav-text">Tableau de bord</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link" data-page="members" id="nav-members">
+                        <span class="material-icons-round">groups</span>
+                        <span class="nav-text">Membres</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link" data-page="schedule" id="nav-schedule">
+                        <span class="material-icons-round">calendar_month</span>
+                        <span class="nav-text">Planning</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link" data-page="finances" id="nav-finances">
+                        <span class="material-icons-round">account_balance_wallet</span>
+                        <span class="nav-text">Finances</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="nav-link" data-page="communications" id="nav-communications">
+                        <span class="material-icons-round">campaign</span>
+                        <span class="nav-text">Communications</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-card">
+                <div class="user-avatar">RK</div>
+                <div class="user-info">
+                    <span class="user-name">Roger K.</span>
+                    <span class="user-role">Administrateur</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content" id="main-content">
+        <!-- Top Bar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open menu">
+                    <span class="material-icons-round">menu</span>
+                </button>
+                <h1 class="page-title" id="page-title">Tableau de bord</h1>
+            </div>
+            <div class="topbar-right">
+                <div class="search-box" id="search-box">
+                    <span class="material-icons-round">search</span>
+                    <input type="text" placeholder="Rechercher..." id="global-search" autocomplete="off">
+                </div>
+                <button class="icon-btn notification-btn" id="notification-btn" aria-label="Notifications">
+                    <span class="material-icons-round">notifications</span>
+                    <span class="notification-badge">3</span>
+                </button>
+                <button class="icon-btn theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+                    <span class="material-icons-round">dark_mode</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Page Container -->
+        <div class="page-container" id="page-container">
+
+            <!-- ==================== DASHBOARD PAGE ==================== -->
+            <section class="page active" id="page-dashboard">
+                <!-- Stats Row -->
+                <div class="stats-grid">
+                    <div class="stat-card" id="stat-members">
+                        <div class="stat-icon blue">
+                            <span class="material-icons-round">groups</span>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-members-count">0</span>
+                            <span class="stat-label">Membres actifs</span>
+                        </div>
+                        <div class="stat-trend up">
+                            <span class="material-icons-round">trending_up</span>
+                            <span>+12%</span>
+                        </div>
+                    </div>
+                    <div class="stat-card" id="stat-sessions">
+                        <div class="stat-icon emerald">
+                            <span class="material-icons-round">event</span>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-sessions-count">0</span>
+                            <span class="stat-label">Séances ce mois</span>
+                        </div>
+                        <div class="stat-trend up">
+                            <span class="material-icons-round">trending_up</span>
+                            <span>+5%</span>
+                        </div>
+                    </div>
+                    <div class="stat-card" id="stat-attendance">
+                        <div class="stat-icon amber">
+                            <span class="material-icons-round">how_to_reg</span>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-attendance-rate">0%</span>
+                            <span class="stat-label">Taux de présence</span>
+                        </div>
+                        <div class="stat-trend down">
+                            <span class="material-icons-round">trending_down</span>
+                            <span>-3%</span>
+                        </div>
+                    </div>
+                    <div class="stat-card" id="stat-revenue">
+                        <div class="stat-icon purple">
+                            <span class="material-icons-round">euro</span>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-revenue-total">0 €</span>
+                            <span class="stat-label">Recettes totales</span>
+                        </div>
+                        <div class="stat-trend up">
+                            <span class="material-icons-round">trending_up</span>
+                            <span>+8%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="dashboard-grid">
+                    <div class="card chart-card" id="attendance-chart-card">
+                        <div class="card-header">
+                            <h2>Présence hebdomadaire</h2>
+                            <select class="mini-select" id="attendance-period">
+                                <option value="week">Cette semaine</option>
+                                <option value="month">Ce mois</option>
+                                <option value="quarter">Ce trimestre</option>
+                            </select>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container" id="attendance-chart"></div>
+                        </div>
+                    </div>
+                    <div class="card" id="upcoming-events-card">
+                        <div class="card-header">
+                            <h2>Prochains événements</h2>
+                            <a href="#" class="card-action" data-page="schedule">Voir tout</a>
+                        </div>
+                        <div class="card-body">
+                            <ul class="event-list" id="upcoming-events-list">
+                                <!-- Populated by JS -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Members & Activity -->
+                <div class="dashboard-grid">
+                    <div class="card" id="recent-members-card">
+                        <div class="card-header">
+                            <h2>Nouveaux membres</h2>
+                            <a href="#" class="card-action" data-page="members">Voir tout</a>
+                        </div>
+                        <div class="card-body">
+                            <ul class="member-list-mini" id="recent-members-list">
+                                <!-- Populated by JS -->
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card" id="financial-summary-card">
+                        <div class="card-header">
+                            <h2>Résumé financier</h2>
+                            <a href="#" class="card-action" data-page="finances">Détails</a>
+                        </div>
+                        <div class="card-body">
+                            <div class="finance-summary" id="finance-summary">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== MEMBERS PAGE ==================== -->
+            <section class="page" id="page-members">
+                <div class="page-header">
+                    <div class="page-header-left">
+                        <div class="search-filter-bar">
+                            <div class="search-input">
+                                <span class="material-icons-round">search</span>
+                                <input type="text" placeholder="Rechercher un membre..." id="member-search">
+                            </div>
+                            <select class="filter-select" id="member-status-filter">
+                                <option value="all">Tous les statuts</option>
+                                <option value="active">Actif</option>
+                                <option value="inactive">Inactif</option>
+                                <option value="pending">En attente</option>
+                            </select>
+                            <select class="filter-select" id="member-category-filter">
+                                <option value="all">Toutes catégories</option>
+                                <option value="senior">Senior</option>
+                                <option value="junior">Junior</option>
+                                <option value="veteran">Vétéran</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="add-member-btn">
+                        <span class="material-icons-round">person_add</span>
+                        Ajouter un membre
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table" id="members-table">
+                        <thead>
+                            <tr>
+                                <th>Membre</th>
+                                <th>Catégorie</th>
+                                <th>Statut</th>
+                                <th>Cotisation</th>
+                                <th>Présence</th>
+                                <th>Inscription</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="members-table-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="table-footer" id="members-table-footer">
+                    <span class="table-info" id="members-count-info">0 membres</span>
+                    <div class="pagination" id="members-pagination">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== SCHEDULE PAGE ==================== -->
+            <section class="page" id="page-schedule">
+                <div class="page-header">
+                    <div class="page-header-left">
+                        <div class="calendar-nav">
+                            <button class="icon-btn" id="cal-prev" aria-label="Mois précédent">
+                                <span class="material-icons-round">chevron_left</span>
+                            </button>
+                            <h2 class="calendar-title" id="calendar-title">Avril 2026</h2>
+                            <button class="icon-btn" id="cal-next" aria-label="Mois suivant">
+                                <span class="material-icons-round">chevron_right</span>
+                            </button>
+                        </div>
+                        <div class="view-toggle">
+                            <button class="view-btn active" data-view="month" id="view-month">Mois</button>
+                            <button class="view-btn" data-view="week" id="view-week">Semaine</button>
+                            <button class="view-btn" data-view="list" id="view-list">Liste</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="add-event-btn">
+                        <span class="material-icons-round">add</span>
+                        Nouvel événement
+                    </button>
+                </div>
+
+                <div class="calendar-grid" id="calendar-grid">
+                    <!-- Calendar header -->
+                    <div class="calendar-header-row">
+                        <div class="cal-day-name">Lun</div>
+                        <div class="cal-day-name">Mar</div>
+                        <div class="cal-day-name">Mer</div>
+                        <div class="cal-day-name">Jeu</div>
+                        <div class="cal-day-name">Ven</div>
+                        <div class="cal-day-name">Sam</div>
+                        <div class="cal-day-name">Dim</div>
+                    </div>
+                    <div class="calendar-body" id="calendar-body">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== FINANCES PAGE ==================== -->
+            <section class="page" id="page-finances">
+                <div class="stats-grid">
+                    <div class="stat-card" id="fin-income">
+                        <div class="stat-icon emerald">
+                            <span class="material-icons-round">arrow_downward</span>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="fin-income-value">0 €</span>
+                            <span class="stat-label">Recettes</span>
+                        </div>
+                    </div>
+                    <div class="stat-card" id="fin-expenses">
+                        <div class="stat-icon rose">
+                            <span class="material-icons-round">arrow_upward</span>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="fin-expenses-value">0 €</span>
+                            <span class="stat-label">Dépenses</span>
+                        </div>
+                    </div>
+                    <div class="stat-card" id="fin-balance">
+                        <div class="stat-icon blue">
+                            <span class="material-icons-round">account_balance</span>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="fin-balance-value">0 €</span>
+                            <span class="stat-label">Solde</span>
+                        </div>
+                    </div>
+                    <div class="stat-card" id="fin-pending">
+                        <div class="stat-icon amber">
+                            <span class="material-icons-round">pending_actions</span>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="fin-pending-value">0 €</span>
+                            <span class="stat-label">Cotisations en attente</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="card chart-card" id="finance-chart-card">
+                        <div class="card-header">
+                            <h2>Évolution financière</h2>
+                            <select class="mini-select" id="finance-period">
+                                <option value="6">6 derniers mois</option>
+                                <option value="12">12 derniers mois</option>
+                            </select>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container" id="finance-chart"></div>
+                        </div>
+                    </div>
+                    <div class="card" id="finance-breakdown-card">
+                        <div class="card-header">
+                            <h2>Répartition des dépenses</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="breakdown-list" id="expense-breakdown">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" id="transactions-card">
+                    <div class="card-header">
+                        <h2>Dernières transactions</h2>
+                        <button class="btn btn-primary btn-sm" id="add-transaction-btn">
+                            <span class="material-icons-round">add</span>
+                            Nouvelle transaction
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <table class="data-table" id="transactions-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Catégorie</th>
+                                    <th>Montant</th>
+                                    <th>Type</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactions-table-body">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== COMMUNICATIONS PAGE ==================== -->
+            <section class="page" id="page-communications">
+                <div class="page-header">
+                    <div class="page-header-left">
+                        <h2 class="section-title">Annonces et notifications</h2>
+                    </div>
+                    <button class="btn btn-primary" id="new-announcement-btn">
+                        <span class="material-icons-round">edit</span>
+                        Nouvelle annonce
+                    </button>
+                </div>
+
+                <div class="comms-grid">
+                    <div class="card" id="announcements-card">
+                        <div class="card-header">
+                            <h2>Annonces récentes</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="announcements-list" id="announcements-list">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card" id="quick-message-card">
+                        <div class="card-header">
+                            <h2>Message rapide</h2>
+                        </div>
+                        <div class="card-body">
+                            <form class="quick-message-form" id="quick-message-form">
+                                <div class="form-group">
+                                    <label for="msg-recipients">Destinataires</label>
+                                    <select id="msg-recipients" class="form-select">
+                                        <option value="all">Tous les membres</option>
+                                        <option value="active">Membres actifs</option>
+                                        <option value="senior">Seniors</option>
+                                        <option value="junior">Juniors</option>
+                                        <option value="veteran">Vétérans</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="msg-subject">Objet</label>
+                                    <input type="text" id="msg-subject" class="form-input" placeholder="Objet du message...">
+                                </div>
+                                <div class="form-group">
+                                    <label for="msg-body">Message</label>
+                                    <textarea id="msg-body" class="form-textarea" rows="5" placeholder="Votre message..."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <span class="material-icons-round">send</span>
+                                    Envoyer
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Modal Overlay -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modal-title">Modal</h2>
+                <button class="icon-btn modal-close" id="modal-close" aria-label="Fermer">
+                    <span class="material-icons-round">close</span>
+                </button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="js/data.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
