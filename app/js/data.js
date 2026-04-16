@@ -214,10 +214,20 @@ function formatCurrency(amount) {
 }
 
 /**
- * Get French status label
+ * Get French status label (Global Status)
  */
-function getStatusLabel(status) {
-    const labels = { active: 'Actif', inactive: 'Inactif', pending: 'En attente' };
+function getStatusLabel(member) {
+    if (member.registrationStatus === 'registered' && member.duesStatus === 'paid') {
+        return 'Régularisé';
+    }
+    return 'Non régularisé';
+}
+
+/**
+ * Get French registration label
+ */
+function getRegistrationLabel(status) {
+    const labels = { registered: 'Inscrit', unregistered: 'Non inscrit' };
     return labels[status] || status;
 }
 
@@ -225,7 +235,7 @@ function getStatusLabel(status) {
  * Get French dues label
  */
 function getDuesLabel(dues) {
-    const labels = { paid: 'Payée', unpaid: 'Impayée', partial: 'Partielle' };
+    const labels = { paid: 'Payée', unpaid: 'Impayée', pending: 'En cours' };
     return labels[dues] || dues;
 }
 

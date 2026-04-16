@@ -10,6 +10,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body { max-width: 100vw; overflow-x: hidden; }
+        .main-content { max-width: 100%; overflow-x: hidden; }
+    </style>
 </head>
 <body>
     <!-- Sidebar Navigation -->
@@ -240,40 +244,66 @@
 
             <!-- ==================== MEMBERS PAGE ==================== -->
             <section class="page" id="page-members">
-                <div class="page-header">
-                    <div class="page-header-left">
-                        <div class="search-filter-bar">
-                            <div class="search-input">
-                                <span class="material-icons-round">search</span>
-                                <input type="text" placeholder="Rechercher un membre..." id="member-search">
-                            </div>
-                            <select class="filter-select" id="member-status-filter">
-                                <option value="all">Tous les statuts</option>
-                                <option value="active">Actif</option>
-                                <option value="inactive">Inactif</option>
-                                <option value="pending">En attente</option>
+                <div class="table-header-compact">
+                    <div class="table-header-left">
+                        <div class="search-input compact">
+                            <span class="material-icons-round">search</span>
+                            <input type="text" placeholder="Chercher..." id="member-search">
+                        </div>
+                        <div class="filters-inline">
+                            <select class="filter-select-mini" id="member-status-filter">
+                                <option value="all">Statut Global</option>
+                                <option value="regularized">Régularisé</option>
+                                <option value="unregularized">Non régularisé</option>
                             </select>
-                            <!-- Catégorie masquée car uniquement Senior -->
-                            <select class="filter-select" id="member-category-filter" style="display:none">
-                                <option value="senior">Senior</option>
+                            <select class="filter-select-mini" id="member-registration-filter">
+                                <option value="all">Inscription</option>
+                                <option value="registered">Inscrit</option>
+                                <option value="unregistered">Non inscrit</option>
+                            </select>
+                            <select class="filter-select-mini" id="member-dues-filter">
+                                <option value="all">Cotisation</option>
+                                <option value="paid">Payée</option>
+                                <option value="unpaid">Impayée</option>
+                                <option value="pending">En cours</option>
                             </select>
                         </div>
                     </div>
-                    <button class="btn btn-primary" id="add-member-btn">
-                        <span class="material-icons-round">person_add</span>
-                        Ajouter un membre
-                    </button>
+                    <div class="table-header-right">
+                        <button class="btn btn-primary btn-sm" id="add-member-btn">
+                            <span class="material-icons-round">person_add</span>
+                            Membre
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Bulk Actions Bar (hidden by default) -->
+                <div id="bulk-actions-bar" class="bulk-actions-bar" style="display:none;">
+                    <div class="bulk-info"><span id="selected-count">0</span> membre(s) sélectionné(s)</div>
+                    <div class="bulk-buttons">
+                        <button class="btn btn-primary btn-sm" onclick="SportFlow.bulkAction('email')">
+                            <span class="material-icons-round">mail</span> Message groupé (Mail)
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="SportFlow.bulkAction('wa')">
+                            <span class="material-icons-round">chat</span> Message groupé (WhatsApp)
+                        </button>
+                        <button class="btn btn-ghost btn-sm" onclick="SportFlow.clearSelection()">Annuler</button>
+                    </div>
                 </div>
 
                 <div class="table-container">
                     <table class="data-table" id="members-table">
                         <thead>
                             <tr>
-                                <th>Membre</th>
-                                <th>Statut</th>
+                                <th style="width:40px; padding: 10px 4px 10px 12px;">
+                                    <input type="checkbox" id="select-all-members" title="Tout sélectionner">
+                                </th>
+                                <th style="padding-left: 0;">Membre</th>
+                                <th>Statut Global</th>
+                                <th>Inscription</th>
                                 <th>Cotisation</th>
                                 <th>Présence</th>
-                                <th>Inscription</th>
+                                <th>Date d'adhésion</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>

@@ -14,18 +14,26 @@ export class Member {
   @Column()
   email: string;
 
+  @Column({ nullable: true })
+  phone: string;
+
   @Column({ default: 'senior' })
   category: string;
 
-  @Column({ default: 'active' })
-  status: string;
+  @Column({ default: 'unregistered' }) // registered, unregistered
+  registrationStatus: string;
 
-  @Column({ default: 'unpaid' })
-  dues: string;
+  @Column({ default: 'unpaid' }) // paid, unpaid, pending
+  duesStatus: string;
 
   @Column({ default: 0 })
   attendance: number;
 
   @CreateDateColumn()
   joinDate: Date;
+
+  // Le statut global est calculé : Régularisé si Inscrit ET Cotisation Payée
+  get isRegularized(): boolean {
+    return this.registrationStatus === 'registered' && this.duesStatus === 'paid';
+  }
 }

@@ -82,6 +82,7 @@
     let currentPage = 'dashboard';
     let currentCalMonth = new Date().getMonth();
     let currentCalYear = new Date().getFullYear();
+    let SELECTED_MEMBERS = new Set();
 
     // ============================================
     // NAVIGATION
@@ -227,7 +228,8 @@
             return;
         }
 
-        const activeMembers = MEMBERS.filter(m => m.status === 'active');
+        const membersCount = MEMBERS.length;
+        const regularizedMembers = MEMBERS.filter(m => m.registrationStatus === 'registered' && m.duesStatus === 'paid');
         const thisMonth = new Date().getMonth();
         const thisYear = new Date().getFullYear();
         const sessionsThisMonth = EVENTS.filter(e => {
@@ -235,8 +237,8 @@
             return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
         });
         
-        const totalAttendance = activeMembers.reduce((s, m) => s + (m.attendance || 0), 0);
-        const avgAttendance = activeMembers.length > 0 ? Math.round(totalAttendance / activeMembers.length) : 0;
+        const totalAttendance = MEMBERS.reduce((s, m) => s + (m.attendance || 0), 0);
+        const avgAttendance = membersCount > 0 ? Math.round(totalAttendance / membersCount) : 0;
         
         // Sports Stats Calculation
         const playedMatches = EVENTS.filter(e => e.type === 'match' && e.result && e.result !== 'pending');
@@ -278,10 +280,14 @@
         const topAssists = getTopRanking(assistsMap);
 
         // Update Dashboard Stats
-        animateCounter('stat-members-count', activeMembers.length);
+        animateCounter('stat-members-count', membersCount);
         animateCounter('stat-sessions-count', sessionsThisMonth.length);
         document.getElementById('stat-attendance-rate').textContent = avgAttendance + '%';
         document.getElementById('stat-winrate-value').textContent = winRate + '%';
+        // Petit indicateur de régularisation dans le dashboard (optionnel)
+        if (document.getElementById('stat-regularized-count')) {
+            document.getElementById('stat-regularized-count').textContent = regularizedMembers.length;
+        }
         document.getElementById('stat-matches-count').textContent = playedMatches.length + ' m.';
 
         // Render Rankings
@@ -342,7 +348,7 @@
                     <div class="member-mini-name">${m.firstName} ${m.lastName}</div>
                     <div class="member-mini-date">Inscrit le ${formatDateFR(m.joinDate)}</div>
                 </div>
-                <span class="status-badge ${m.status}">${getStatusLabel(m.status)}</span>
+                <span class="status-badge ${m.registrationStatus === 'registered' && m.duesStatus === 'paid' ? 'success' : 'pending'}">${getStatusLabel(m)}</span>
             </li>
         `).join('');
 
@@ -350,7 +356,7 @@
         const finSummary = document.getElementById('finance-summary');
         const totalIncome = TRANSACTIONS.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
         const totalExpenses = Math.abs(TRANSACTIONS.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0));
-        const pendingDues = MEMBERS.filter(m => m.dues === 'unpaid' || m.dues === 'partial').length * 250;
+        const pendingDues = MEMBERS.filter(m => m.duesStatus !== 'paid').length * 50; // 50€ par défaut
         const balance = totalIncome - totalExpenses;
 
         finSummary.innerHTML = `
@@ -405,24 +411,36 @@
     function renderMembers() {
         const searchInput = document.getElementById('member-search');
         const statusFilter = document.getElementById('member-status-filter');
-        const categoryFilter = document.getElementById('member-category-filter');
+        const registrationFilter = document.getElementById('member-registration-filter');
+        const duesFilter = document.getElementById('member-dues-filter');
 
-        function render() {
+        const getFiltered = () => {
             const query = searchInput.value.toLowerCase();
-            const status = statusFilter.value;
-            const category = categoryFilter.value;
+            const status = statusFilter.value; 
+            const registration = registrationFilter.value;
+            const dues = duesFilter.value;
 
-            let filtered = MEMBERS.filter(m => {
-                const matchSearch = !query || `${m.firstName} ${m.lastName} ${m.email}`.toLowerCase().includes(query);
-                const matchStatus = status === 'all' || m.status === status;
-                return matchSearch && matchStatus;
+            return MEMBERS.filter(m => {
+                const isReg = m.registrationStatus === 'registered' && m.duesStatus === 'paid';
+                const matchSearch = !query || `${m.firstName} ${m.lastName} ${m.email} ${m.phone || ''}`.toLowerCase().includes(query);
+                const matchStatus = status === 'all' || (status === 'regularized' ? isReg : !isReg);
+                const matchReg = registration === 'all' || m.registrationStatus === registration;
+                const matchDues = dues === 'all' || m.duesStatus === dues;
+                return matchSearch && matchStatus && matchReg && matchDues;
             });
+        };
 
+        // Exporter la fonction de rendu pour y accéder depuis SportFlow
+        SportFlow.renderMembersTable = function() {
+            const filtered = getFiltered();
             const tbody = document.getElementById('members-table-body');
             tbody.innerHTML = filtered.map(m => {
-                const attClass = m.attendance >= 80 ? 'high' : m.attendance >= 50 ? 'medium' : 'low';
+                const attClass = (m.attendance || 0) >= 80 ? 'high' : (m.attendance || 0) >= 50 ? 'medium' : 'low';
+                const isReg = m.registrationStatus === 'registered' && m.duesStatus === 'paid';
+                const isChecked = SELECTED_MEMBERS.has(m.id) ? 'checked' : '';
                 return `
-                    <tr>
+                    <tr class="${isChecked ? 'selected' : ''}">
+                        <td><input type="checkbox" class="member-checkbox" ${isChecked} onchange="SportFlow.toggleMember(${m.id})"></td>
                         <td>
                             <div class="table-member">
                                 <div class="table-member-avatar" style="background:${getAvatarColor(m.id)}">${getInitials(m.firstName, m.lastName)}</div>
@@ -432,12 +450,13 @@
                                 </div>
                             </div>
                         </td>
-                        <td><span class="status-badge ${m.status}">${getStatusLabel(m.status)}</span></td>
-                        <td><span class="status-badge ${m.dues}">${getDuesLabel(m.dues)}</span></td>
+                        <td><span class="status-badge ${isReg ? 'success' : 'pending'}">${getStatusLabel(m)}</span></td>
+                        <td><span class="status-badge ${m.registrationStatus === 'registered' ? 'active' : 'inactive'}">${getRegistrationLabel(m.registrationStatus)}</span></td>
+                        <td><span class="status-badge ${m.duesStatus}">${getDuesLabel(m.duesStatus)}</span></td>
                         <td>
                             <div class="attendance-bar">
-                                <div class="attendance-track"><div class="attendance-fill ${attClass}" style="width:${m.attendance}%"></div></div>
-                                <span class="attendance-value">${m.attendance}%</span>
+                                <div class="attendance-track"><div class="attendance-fill ${attClass}" style="width:${m.attendance || 0}%"></div></div>
+                                <span class="attendance-value">${m.attendance || 0}%</span>
                             </div>
                         </td>
                         <td>${formatDateFR(m.joinDate)}</td>
@@ -445,6 +464,7 @@
                             <div class="table-actions">
                                 <button class="table-action-btn" title="Voir" onclick="SportFlow.viewMember(${m.id})"><span class="material-icons-round">visibility</span></button>
                                 <button class="table-action-btn" title="Modifier" onclick="SportFlow.editMember(${m.id})"><span class="material-icons-round">edit</span></button>
+                                <button class="table-action-btn" title="Plus" onclick="SportFlow.showMemberActions(${m.id}, event)"><span class="material-icons-round">more_horiz</span></button>
                             </div>
                         </td>
                     </tr>
@@ -452,11 +472,25 @@
             }).join('');
 
             document.getElementById('members-count-info').textContent = `${filtered.length} membre${filtered.length > 1 ? 's' : ''}`;
-        }
+        };
 
-        searchInput.addEventListener('input', render);
-        statusFilter.addEventListener('change', render);
-        categoryFilter.addEventListener('change', render);
+        const render = SportFlow.renderMembersTable;
+
+        searchInput.addEventListener('input', () => { SELECTED_MEMBERS.clear(); SportFlow.updateBulkBar(); render(); });
+        statusFilter.addEventListener('change', () => { SELECTED_MEMBERS.clear(); SportFlow.updateBulkBar(); render(); });
+        registrationFilter.addEventListener('change', () => { SELECTED_MEMBERS.clear(); SportFlow.updateBulkBar(); render(); });
+        duesFilter.addEventListener('change', () => { SELECTED_MEMBERS.clear(); SportFlow.updateBulkBar(); render(); });
+
+        document.getElementById('select-all-members').onclick = (e) => {
+            const isChecked = e.target.checked;
+            if (isChecked) {
+                getFiltered().forEach(m => SELECTED_MEMBERS.add(m.id));
+            } else {
+                SELECTED_MEMBERS.clear();
+            }
+            SportFlow.updateBulkBar();
+            render();
+        };
 
         render();
 
@@ -468,27 +502,46 @@
     }
 
     function getMemberFormHTML(member = null) {
-        const m = member || { firstName: '', lastName: '', email: '', category: 'senior', status: 'active', dues: 'unpaid' };
+        const m = member || { firstName: '', lastName: '', email: '', phone: '', registrationStatus: 'unregistered', duesStatus: 'unpaid' };
         return `
             <form id="member-form" class="modal-form">
-                <div class="form-group">
-                    <label for="mf-first">Prénom</label>
-                    <input type="text" id="mf-first" class="form-input" value="${m.firstName}" required>
-                </div>
-                <div class="form-group">
-                    <label for="mf-last">Nom</label>
-                    <input type="text" id="mf-last" class="form-input" value="${m.lastName}" required>
-                </div>
-                <div class="form-group">
-                    <label for="mf-email">Email</label>
-                    <input type="email" id="mf-email" class="form-input" value="${m.email}" required>
-                </div>
+                <style>
+                    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+                </style>
+                <div class="form-row">
                     <div class="form-group">
-                        <label for="mf-status">Statut</label>
-                        <select id="mf-status" class="form-select">
-                            <option value="active" ${m.status === 'active' ? 'selected' : ''}>Actif</option>
-                            <option value="inactive" ${m.status === 'inactive' ? 'selected' : ''}>Inactif</option>
-                            <option value="pending" ${m.status === 'pending' ? 'selected' : ''}>En attente</option>
+                        <label for="mf-first">Prénom</label>
+                        <input type="text" id="mf-first" class="form-input" value="${m.firstName}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="mf-last">Nom</label>
+                        <input type="text" id="mf-last" class="form-input" value="${m.lastName}" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="mf-email">Email</label>
+                        <input type="email" id="mf-email" class="form-input" value="${m.email}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="mf-phone">Téléphone</label>
+                        <input type="tel" id="mf-phone" class="form-input" value="${m.phone || ''}" placeholder="06XXXXXXXX">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="mf-registration">Inscription (10€)</label>
+                        <select id="mf-registration" class="form-select">
+                            <option value="unregistered" ${m.registrationStatus === 'unregistered' ? 'selected' : ''}>Non inscrit</option>
+                            <option value="registered" ${m.registrationStatus === 'registered' ? 'selected' : ''}>Inscrit (Régularisé)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="mf-dues">Cotisation</label>
+                        <select id="mf-dues" class="form-select">
+                            <option value="unpaid" ${m.duesStatus === 'unpaid' ? 'selected' : ''}>Impayée</option>
+                            <option value="pending" ${m.duesStatus === 'pending' ? 'selected' : ''}>En cours</option>
+                            <option value="paid" ${m.duesStatus === 'paid' ? 'selected' : ''}>Payée</option>
                         </select>
                     </div>
                 </div>
@@ -509,7 +562,9 @@
                 firstName: document.getElementById('mf-first').value,
                 lastName: document.getElementById('mf-last').value,
                 email: document.getElementById('mf-email').value,
-                status: document.getElementById('mf-status').value,
+                phone: document.getElementById('mf-phone').value,
+                registrationStatus: document.getElementById('mf-registration').value,
+                duesStatus: document.getElementById('mf-dues').value,
             };
 
             try {
@@ -1073,31 +1128,145 @@
         viewMember(id) {
             const m = MEMBERS.find(m => m.id === id);
             if (!m) return;
-            const attClass = m.attendance >= 80 ? 'high' : m.attendance >= 50 ? 'medium' : 'low';
+            const attClass = (m.attendance || 0) >= 80 ? 'high' : (m.attendance || 0) >= 50 ? 'medium' : 'low';
             openModal(`${m.firstName} ${m.lastName}`, `
                 <div style="text-align:center; margin-bottom:20px;">
                     <div class="member-avatar" style="background:${getAvatarColor(m.id)}; width:64px; height:64px; font-size:1.3rem; margin:0 auto 12px;">${getInitials(m.firstName, m.lastName)}</div>
                     <h3 style="font-size:1.1rem; font-weight:700;">${m.firstName} ${m.lastName}</h3>
                     <p style="color:var(--text-secondary); font-size:0.85rem;">${m.email}</p>
+                    ${m.phone ? `<p style="color:var(--text-secondary); font-size:0.85rem;">${m.phone}</p>` : ''}
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
                     <div style="text-align:center; padding:12px; background:var(--bg-tertiary); border-radius:var(--radius-md);">
-                        <div style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:4px;">Statut</div>
-                        <div><span class="status-badge ${m.status}">${getStatusLabel(m.status)}</span></div>
+                        <div style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:4px;">Inscription</div>
+                        <div><span class="status-badge ${m.registrationStatus === 'registered' ? 'active' : 'inactive'}">${getRegistrationLabel(m.registrationStatus)}</span></div>
                     </div>
                     <div style="text-align:center; padding:12px; background:var(--bg-tertiary); border-radius:var(--radius-md);">
                         <div style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:4px;">Cotisation</div>
-                        <div><span class="status-badge ${m.dues}">${getDuesLabel(m.dues)}</span></div>
+                        <div><span class="status-badge ${m.duesStatus}">${getDuesLabel(m.duesStatus)}</span></div>
                     </div>
-                    <div style="text-align:center; padding:12px; background:var(--bg-tertiary); border-radius:var(--radius-md);">
+                    <div style="text-align:center; grid-column: span 2; padding:12px; background:var(--bg-tertiary); border-radius:var(--radius-md); border:1px solid var(--border-color);">
+                         <div style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:4px;">Statut Global</div>
+                         <div style="font-weight:700;">${getStatusLabel(m)}</div>
+                    </div>
+                    <div style="text-align:center; grid-column: span 2; padding:12px; background:var(--bg-tertiary); border-radius:var(--radius-md);">
                         <div style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:4px;">Présence</div>
-                        <div style="font-weight:700; color:var(--accent-${attClass === 'high' ? 'emerald' : attClass === 'medium' ? 'amber' : 'rose'})">${m.attendance}%</div>
+                        <div style="font-weight:700; color:var(--accent-${attClass === 'high' ? 'emerald' : attClass === 'medium' ? 'amber' : 'rose'})">${m.attendance || 0}%</div>
                     </div>
                 </div>
                 <div style="margin-top:16px; text-align:center; font-size:0.8rem; color:var(--text-tertiary);">
                     Inscrit le ${formatDateFR(m.joinDate)}
                 </div>
             `);
+        },
+        showMemberActions(id, event) {
+            const m = MEMBERS.find(m => m.id === id);
+            if (!m) return;
+
+            const menuHTML = `
+                <div style="display:flex; flex-direction:column; gap:4px; padding:6px;">
+                    <button class="btn btn-ghost" style="justify-content:flex-start; font-size:0.8rem; padding:8px 12px; height:auto;" onclick="SportFlow.showCommunicationModal([${m.id}], 'WhatsApp')">
+                        <span class="material-icons-round" style="color:#2563eb; font-size:18px;">chat</span> WhatsApp
+                    </button>
+                    <button class="btn btn-ghost" style="justify-content:flex-start; font-size:0.8rem; padding:8px 12px; height:auto;" onclick="SportFlow.showCommunicationModal([${m.id}], 'Email')">
+                        <span class="material-icons-round" style="color:#2563eb; font-size:18px;">mail</span> Email
+                    </button>
+                </div>
+            `;
+            openModal(`Actions : ${m.firstName}`, menuHTML);
+        },
+        toggleMember(id) {
+            if (SELECTED_MEMBERS.has(id)) {
+                SELECTED_MEMBERS.delete(id);
+            } else {
+                SELECTED_MEMBERS.add(id);
+            }
+            this.updateBulkBar();
+            this.renderMembersTable();
+        },
+        updateBulkBar() {
+            const bar = document.getElementById('bulk-actions-bar');
+            const countEl = document.getElementById('selected-count');
+            const count = SELECTED_MEMBERS.size;
+            
+            if (count > 0) {
+                bar.style.display = 'flex';
+                bar.style.opacity = '1';
+                bar.style.pointerEvents = 'auto';
+                countEl.textContent = count;
+            } else {
+                bar.style.display = 'none';
+            }
+        },
+        clearSelection() {
+            SELECTED_MEMBERS.clear();
+            const selectAll = document.getElementById('select-all-members');
+            if (selectAll) selectAll.checked = false;
+            this.updateBulkBar();
+            this.renderMembersTable();
+        },
+        bulkAction(type) {
+            const selectedIds = Array.from(SELECTED_MEMBERS);
+            const mode = type === 'email' ? 'Email' : 'WhatsApp';
+            this.showCommunicationModal(selectedIds, mode);
+        },
+        showCommunicationModal(memberIds, mode) {
+            const selectedMembers = MEMBERS.filter(m => memberIds.includes(m.id));
+            const count = selectedMembers.length;
+            
+            const listHTML = selectedMembers.map(m => `
+                <div style="padding:10px 0; border-bottom:1px solid var(--border-light);">
+                    <div style="font-weight:700; font-size:0.85rem;">• ${m.firstName} ${m.lastName}</div>
+                    <div style="margin-top:6px; padding-left:12px;">
+                        <div style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:4px; font-weight:800;">[INSCRIPTION]</div>
+                        <div style="font-size:0.75rem; color:var(--text-secondary);">- Statut : ${getRegistrationLabel(m.registrationStatus)} (10 €)</div>
+                        
+                        <div style="font-size:0.75rem; color:var(--text-tertiary); margin:6px 0 4px; font-weight:800;">[COTISATION]</div>
+                        <div style="font-size:0.75rem; color:var(--text-secondary);">- Statut : ${getDuesLabel(m.duesStatus)}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            const html = `
+                <div style="padding:2px;">
+                    <p style="font-size:0.9rem; font-weight:700; margin-bottom:12px; border-bottom:2px solid var(--accent-blue); padding-bottom:8px;">${mode} : RÉCAPITULATIF (${count} membres)</p>
+                    
+                    <div style="max-height:300px; overflow-y:auto; margin-bottom:16px;">
+                        ${listHTML}
+                    </div>
+
+                    <p style="background:#fefce8; border:1px solid #fef08a; padding:10px; border-radius:4px; font-size:0.75rem; color:#854d0e; font-weight:600; text-align:center;">
+                        Logique d'envoi en cours de développement
+                    </p>
+                    
+                    <div style="display:flex; gap:8px; margin-top:20px;">
+                        <button class="btn btn-secondary" style="flex:1;" onclick="closeModal()">Fermer</button>
+                    </div>
+                </div>
+            `;
+
+            openModal(null, html);
+        },
+        copyToClipboard(text, message) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast(message, 'success');
+            });
+        },
+        sendCommunication(id, type) {
+            const m = MEMBERS.find(m => m.id === id);
+            if (!m) return;
+
+            const templates = {
+                wa_reg: `https://wa.me/${m.phone?.replace(/\s/g, '')}?text=${encodeURIComponent(`Bonjour ${m.firstName}, n'oublie pas de régler tes 10€ pour finaliser ton inscription à AS FIVE 94.`)}`,
+                email_reg: `mailto:${m.email}?subject=Rappel Inscription&body=${encodeURIComponent(`Bonjour ${m.firstName},\n\nn'oublie pas de régler tes 10€ pour finaliser ton inscription à AS FIVE 94.`)}`,
+                wa_dues: `https://wa.me/${m.phone?.replace(/\s/g, '')}?text=${encodeURIComponent(`Bonjour ${m.firstName}, ta cotisation est actuellement en attente. Merci de régulariser.`)}`,
+                sms_dues: `sms:${m.phone}?body=${encodeURIComponent(`Bonjour ${m.firstName}, ta cotisation est actuellement en attente. Merci de régulariser.`)}`
+            };
+
+            if (templates[type]) {
+                window.open(templates[type], '_blank');
+                closeModal();
+            }
         },
 
         editMember(id) {
@@ -1120,8 +1289,8 @@
     // ============================================
 
     document.getElementById('notification-btn').addEventListener('click', () => {
-        const pendingMembers = MEMBERS.filter(m => m.status === 'pending');
-        const unpaidMembers = MEMBERS.filter(m => m.dues === 'unpaid');
+        const unregMembers = MEMBERS.filter(m => m.registrationStatus === 'unregistered');
+        const unpaidMembers = MEMBERS.filter(m => m.duesStatus === 'unpaid');
         const upcomingEvents = EVENTS.filter(e => {
             const d = new Date(e.date);
             const today = new Date();
@@ -1131,11 +1300,11 @@
 
         let html = '<div style="display:flex; flex-direction:column; gap:12px;">';
 
-        if (pendingMembers.length) {
+        if (unregMembers.length) {
             html += `
                 <div class="announcement-item urgent" style="padding:12px;">
-                    <div class="announcement-title" style="font-size:0.85rem;">${pendingMembers.length} inscription(s) en attente</div>
-                    <div class="announcement-body" style="font-size:0.78rem;">${pendingMembers.map(m => m.firstName + ' ' + m.lastName).join(', ')}</div>
+                    <div class="announcement-title" style="font-size:0.85rem;">${unregMembers.length} inscription(s) non régularisée(s)</div>
+                    <div class="announcement-body" style="font-size:0.78rem;">${unregMembers.map(m => m.firstName + ' ' + m.lastName).join(', ')}</div>
                 </div>
             `;
         }
@@ -1158,7 +1327,7 @@
             `;
         });
 
-        if (!pendingMembers.length && !unpaidMembers.length && !upcomingEvents.length) {
+        if (!unregMembers.length && !unpaidMembers.length && !upcomingEvents.length) {
             html += '<p style="text-align:center; color:var(--text-tertiary); padding:20px;">Aucune notification</p>';
         }
 
