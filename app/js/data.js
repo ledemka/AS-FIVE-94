@@ -25,47 +25,76 @@ const AVATAR_COLORS = [
 const MEMBERS = [
     { id: 1,  firstName: 'Amadou',   lastName: 'Diallo',     email: 'a.diallo@email.com',      category: 'senior',  status: 'active',   dues: 'paid',    attendance: 92, joinDate: '2024-09-15' },
     { id: 2,  firstName: 'Fatou',    lastName: 'Traoré',     email: 'f.traore@email.com',       category: 'senior',  status: 'active',   dues: 'paid',    attendance: 88, joinDate: '2024-10-02' },
-    { id: 3,  firstName: 'Kévin',    lastName: 'Nguyen',     email: 'k.nguyen@email.com',       category: 'junior',  status: 'active',   dues: 'paid',    attendance: 95, joinDate: '2025-01-10' },
+    { id: 3,  firstName: 'Kévin',    lastName: 'Nguyen',     email: 'k.nguyen@email.com',       category: 'senior',  status: 'active',   dues: 'paid',    attendance: 95, joinDate: '2025-01-10' },
     { id: 4,  firstName: 'Marie',    lastName: 'Dupont',     email: 'm.dupont@email.com',        category: 'senior',  status: 'active',   dues: 'partial', attendance: 78, joinDate: '2024-09-20' },
-    { id: 5,  firstName: 'Ibrahim',  lastName: 'Koné',       email: 'i.kone@email.com',          category: 'veteran', status: 'active',   dues: 'paid',    attendance: 65, joinDate: '2023-09-01' },
+    { id: 5,  firstName: 'Ibrahim',  lastName: 'Koné',       email: 'i.kone@email.com',          category: 'senior', status: 'active',   dues: 'paid',    attendance: 65, joinDate: '2023-09-01' },
     { id: 6,  firstName: 'Sophie',   lastName: 'Martin',     email: 's.martin@email.com',        category: 'senior',  status: 'active',   dues: 'paid',    attendance: 90, joinDate: '2024-11-05' },
-    { id: 7,  firstName: 'Moussa',   lastName: 'Camara',     email: 'm.camara@email.com',        category: 'junior',  status: 'active',   dues: 'unpaid',  attendance: 72, joinDate: '2025-02-14' },
+    { id: 7,  firstName: 'Moussa',   lastName: 'Camara',     email: 'm.camara@email.com',        category: 'senior',  status: 'active',   dues: 'unpaid',  attendance: 72, joinDate: '2025-02-14' },
     { id: 8,  firstName: 'Léa',      lastName: 'Bernard',    email: 'l.bernard@email.com',       category: 'senior',  status: 'inactive', dues: 'unpaid',  attendance: 30, joinDate: '2024-09-18' },
     { id: 9,  firstName: 'Ousmane',  lastName: 'Sy',         email: 'o.sy@email.com',             category: 'senior',  status: 'active',   dues: 'paid',    attendance: 85, joinDate: '2024-10-30' },
-    { id: 10, firstName: 'Chloé',    lastName: 'Petit',      email: 'c.petit@email.com',          category: 'junior',  status: 'active',   dues: 'paid',    attendance: 91, joinDate: '2025-03-01' },
-    { id: 11, firstName: 'Abdoulaye',lastName: 'Ba',         email: 'a.ba@email.com',             category: 'veteran', status: 'active',   dues: 'partial', attendance: 60, joinDate: '2023-10-12' },
+    { id: 10, firstName: 'Chloé',    lastName: 'Petit',      email: 'c.petit@email.com',          category: 'senior',  status: 'active',   dues: 'paid',    attendance: 91, joinDate: '2025-03-01' },
+    { id: 11, firstName: 'Abdoulaye',lastName: 'Ba',         email: 'a.ba@email.com',             category: 'senior', status: 'active',   dues: 'partial', attendance: 60, joinDate: '2023-10-12' },
     { id: 12, firstName: 'Emma',     lastName: 'Lefèvre',    email: 'e.lefevre@email.com',        category: 'senior',  status: 'pending',  dues: 'unpaid',  attendance: 0,  joinDate: '2026-04-10' },
     { id: 13, firstName: 'Youssouf', lastName: 'Touré',      email: 'y.toure@email.com',          category: 'senior',  status: 'active',   dues: 'paid',    attendance: 87, joinDate: '2024-12-01' },
-    { id: 14, firstName: 'Inès',     lastName: 'Moreau',     email: 'i.moreau@email.com',         category: 'junior',  status: 'active',   dues: 'paid',    attendance: 94, joinDate: '2025-01-20' },
+    { id: 14, firstName: 'Inès',     lastName: 'Moreau',     email: 'i.moreau@email.com',         category: 'senior',  status: 'active',   dues: 'paid',    attendance: 94, joinDate: '2025-01-20' },
     { id: 15, firstName: 'Seydou',   lastName: 'Cissé',      email: 's.cisse@email.com',          category: 'senior',  status: 'active',   dues: 'paid',    attendance: 82, joinDate: '2024-11-15' },
-    { id: 16, firstName: 'Camille',  lastName: 'Roux',       email: 'c.roux@email.com',           category: 'veteran', status: 'active',   dues: 'paid',    attendance: 70, joinDate: '2023-09-05' },
-    { id: 17, firstName: 'Bakary',   lastName: 'Diarra',     email: 'b.diarra@email.com',         category: 'junior',  status: 'active',   dues: 'partial', attendance: 76, joinDate: '2025-02-28' },
+    { id: 16, firstName: 'Camille',  lastName: 'Roux',       email: 'c.roux@email.com',           category: 'senior', status: 'active',   dues: 'paid',    attendance: 70, joinDate: '2023-09-05' },
+    { id: 17, firstName: 'Bakary',   lastName: 'Diarra',     email: 'b.diarra@email.com',         category: 'senior',  status: 'active',   dues: 'partial', attendance: 76, joinDate: '2025-02-28' },
     { id: 18, firstName: 'Lucas',    lastName: 'Girard',     email: 'l.girard@email.com',         category: 'senior',  status: 'inactive', dues: 'unpaid',  attendance: 15, joinDate: '2024-10-05' },
     { id: 19, firstName: 'Aïssata',  lastName: 'Coulibaly',  email: 'a.coulibaly@email.com',      category: 'senior',  status: 'active',   dues: 'paid',    attendance: 89, joinDate: '2024-09-25' },
     { id: 20, firstName: 'Thomas',   lastName: 'Lambert',    email: 't.lambert@email.com',        category: 'senior',  status: 'active',   dues: 'paid',    attendance: 83, joinDate: '2025-01-05' },
-    { id: 21, firstName: 'Mariama',  lastName: 'Sow',        email: 'm.sow@email.com',            category: 'junior',  status: 'active',   dues: 'paid',    attendance: 96, joinDate: '2025-03-12' },
+    { id: 21, firstName: 'Mariama',  lastName: 'Sow',        email: 'm.sow@email.com',            category: 'senior',  status: 'active',   dues: 'paid',    attendance: 96, joinDate: '2025-03-12' },
     { id: 22, firstName: 'Hugo',     lastName: 'Leroy',      email: 'h.leroy@email.com',          category: 'senior',  status: 'pending',  dues: 'unpaid',  attendance: 0,  joinDate: '2026-04-12' },
-    { id: 23, firstName: 'Awa',      lastName: 'Ndiaye',     email: 'a.ndiaye@email.com',         category: 'veteran', status: 'active',   dues: 'paid',    attendance: 68, joinDate: '2023-11-20' },
+    { id: 23, firstName: 'Awa',      lastName: 'Ndiaye',     email: 'a.ndiaye@email.com',         category: 'senior', status: 'active',   dues: 'paid',    attendance: 68, joinDate: '2023-11-20' },
     { id: 24, firstName: 'Nathan',   lastName: 'Fournier',   email: 'n.fournier@email.com',       category: 'senior',  status: 'active',   dues: 'paid',    attendance: 80, joinDate: '2024-12-20' },
 ];
 
 // ---- Events / Schedule ----
 const EVENTS = [
-    { id: 1,  title: 'Entraînement collectif',    type: 'training',   date: '2026-04-14', time: '19:00', duration: '1h30', location: 'Gymnase A' },
-    { id: 2,  title: 'Match amical vs FC Étoiles', type: 'match',      date: '2026-04-16', time: '15:00', duration: '2h',   location: 'Stade Municipal' },
-    { id: 3,  title: 'Entraînement technique',     type: 'training',   date: '2026-04-17', time: '18:30', duration: '1h30', location: 'Gymnase A' },
-    { id: 4,  title: 'Réunion bureau',              type: 'meeting',    date: '2026-04-18', time: '20:00', duration: '1h',   location: 'Salle polyvalente' },
-    { id: 5,  title: 'Entraînement collectif',      type: 'training',   date: '2026-04-21', time: '19:00', duration: '1h30', location: 'Gymnase A' },
-    { id: 6,  title: 'Tournoi régional',             type: 'tournament', date: '2026-04-26', time: '09:00', duration: '8h',   location: 'Complexe sportif' },
-    { id: 7,  title: 'Entraînement collectif',      type: 'training',   date: '2026-04-28', time: '19:00', duration: '1h30', location: 'Gymnase A' },
-    { id: 8,  title: 'Championnat — Journée 12',    type: 'match',      date: '2026-05-03', time: '16:00', duration: '2h',   location: 'Stade Municipal' },
-    { id: 9,  title: 'Entraînement technique',       type: 'training',   date: '2026-05-05', time: '18:30', duration: '1h30', location: 'Gymnase A' },
-    { id: 10, title: 'Fête du club',                  type: 'meeting',    date: '2026-05-10', time: '14:00', duration: '5h',   location: 'Parc des sports' },
-    { id: 11, title: 'Entraînement collectif',        type: 'training',   date: '2026-04-07', time: '19:00', duration: '1h30', location: 'Gymnase A' },
-    { id: 12, title: 'Match championnat J11',         type: 'match',      date: '2026-04-10', time: '20:00', duration: '2h',   location: 'Stade visiteur' },
-    { id: 13, title: 'Entraînement physique',         type: 'training',   date: '2026-04-09', time: '18:30', duration: '1h30', location: 'Gymnase B' },
-    { id: 14, title: 'Entraînement juniors',          type: 'training',   date: '2026-04-23', time: '17:00', duration: '1h30', location: 'Gymnase A' },
-    { id: 15, title: 'Match amical vs AS Lions',      type: 'match',      date: '2026-04-30', time: '15:00', duration: '2h',   location: 'Stade Municipal' },
+    { 
+        id: 1,  
+        title: 'AS FIVE 94 vs FC Étoiles',    
+        type: 'match',   
+        date: '2026-04-04', 
+        time: '09:30', 
+        duration: '2h', 
+        location: 'Stade AS FIVE',
+        result: 'win',
+        score: '3 - 1',
+        scorers: [
+            { memberId: 1, count: 2 },
+            { memberId: 3, count: 1 }
+        ],
+        assists: [
+            { memberId: 2, count: 1 },
+            { memberId: 5, count: 1 },
+            { memberId: 6, count: 1 }
+        ]
+    },
+    { 
+        id: 2,  
+        title: 'AS FIVE 94 vs Lions SC',    
+        type: 'match',   
+        date: '2026-04-11', 
+        time: '09:30', 
+        duration: '2h', 
+        location: 'Stade AS FIVE',
+        result: 'win',
+        score: '2 - 0',
+        scorers: [
+            { memberId: 1, count: 1 },
+            { memberId: 9, count: 1 }
+        ],
+        assists: [
+            { memberId: 3, count: 2 }
+        ]
+    },
+    { id: 3,  title: 'Match Hebdomadaire',    type: 'match',   date: '2026-04-18', time: '09:30', duration: '2h', location: 'Stade AS FIVE' },
+    { id: 4,  title: 'Match Hebdomadaire',    type: 'match',   date: '2026-04-25', time: '09:30', duration: '2h', location: 'Stade AS FIVE' },
+    { id: 5,  title: 'Match Hebdomadaire',    type: 'match',   date: '2026-05-02', time: '09:30', duration: '2h', location: 'Stade AS FIVE' },
+    { id: 6,  title: 'Match Hebdomadaire',    type: 'match',   date: '2026-05-09', time: '09:30', duration: '2h', location: 'Stade AS FIVE' },
+    { id: 7,  title: 'Match Hebdomadaire',    type: 'match',   date: '2026-05-16', time: '09:30', duration: '2h', location: 'Stade AS FIVE' },
+    { id: 8,  title: 'Match Hebdomadaire',    type: 'match',   date: '2026-05-23', time: '09:30', duration: '2h', location: 'Stade AS FIVE' },
 ];
 
 // ---- Weekly attendance data (for chart) ----

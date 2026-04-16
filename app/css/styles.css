@@ -157,43 +157,44 @@ ul {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 20px 20px 22px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    min-height: 72px;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    min-height: 80px;
+    background: #ffffff;
+    flex-shrink: 0;
 }
 
 .logo {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
+    overflow: hidden;
 }
 
-.logo-icon {
-    font-size: 28px;
-    background: var(--gradient-blue);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+.logo-img {
+    height: 52px;
+    width: 52px;
+    object-fit: contain;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    background: #fff;
 }
 
 .logo-text {
-    font-weight: 700;
-    font-size: 1.25rem;
-    color: #fff;
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    color: #101828;
     white-space: nowrap;
-    letter-spacing: -0.02em;
+    line-height: 1.2;
 }
 
-.sidebar-toggle {
-    color: var(--text-sidebar);
-    padding: 6px;
-    border-radius: var(--radius-sm);
-    transition: background var(--transition-fast);
+.logo-fallback {
     display: none;
-}
-
-.sidebar-toggle:hover {
-    background: var(--bg-sidebar-hover);
+    color: var(--accent-blue);
+    font-size: 32px;
+    flex-shrink: 0;
 }
 
 .sidebar-nav {
@@ -1801,3 +1802,73 @@ ul {
     background: var(--accent-blue);
     color: #fff;
 }
+
+/* ---------- Calendar Match Details ---------- */
+.cal-event-match {
+    position: relative;
+    cursor: pointer;
+    font-weight: 700 !important;
+    text-align: center;
+    background: var(--accent-emerald-light);
+    color: var(--accent-emerald);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    overflow: visible !important; /* Allow tooltip to be seen */
+    white-space: normal !important; /* Allow wrapping if needed */
+    z-index: 1;
+}
+.cal-event-match:hover {
+    background: var(--accent-emerald);
+    color: #fff;
+    z-index: 10; /* Bring to front on hover */
+}
+.match-tooltip {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    width: 240px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-xl);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    z-index: 100;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: left;
+    pointer-events: none;
+    color: var(--text-primary);
+}
+.cal-event-match:hover .match-tooltip {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+.match-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -8px;
+    border-width: 8px;
+    border-style: solid;
+    border-color: var(--bg-secondary) transparent transparent transparent;
+}
+.tooltip-score {
+    font-size: 1.8rem;
+    font-weight: 900;
+    text-align: center;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+}
+.tooltip-team {
+    font-size: 0.8rem;
+    margin-bottom: 8px;
+}
+.tooltip-vert { border-left: 3px solid var(--accent-emerald); padding-left: 8px; }
+.tooltip-orange { border-left: 3px solid var(--accent-amber); padding-left: 8px; }
+.tooltip-team-body { display: block; color: var(--text-secondary); font-size: 0.75rem; margin-top: 2px; }

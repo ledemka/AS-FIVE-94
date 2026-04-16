@@ -27,6 +27,58 @@
     };
 
     // ---- State ----
+    // ---- API & Synchronization ----
+    const API_BASE = 'http://localhost:3000';
+
+    const Api = {
+        async fetch(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers,
+                    },
+                });
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                showToast(`Erreur API: ${error.message}`, 'error');
+                throw error;
+            }
+        },
+        get: (e) => Api.fetch(e),
+        post: (e, d) => Api.fetch(e, { method: 'POST', body: JSON.stringify(d) }),
+        put: (e, d) => Api.fetch(e, { method: 'PUT', body: JSON.stringify(d) }),
+        delete: (e) => Api.fetch(e, { method: 'DELETE' }),
+    };
+
+    const DataSync = {
+        async pullAll() {
+            try {
+                const [members, events, finances] = await Promise.all([
+                    Api.get('/members'),
+                    Api.get('/events'),
+                    Api.get('/finances')
+                ]);
+                
+                // Mettre à jour les références globales
+                MEMBERS.length = 0; MEMBERS.push(...members);
+                EVENTS.length = 0; EVENTS.push(...events);
+                TRANSACTIONS.length = 0; TRANSACTIONS.push(...finances);
+                
+                renderPage(currentPage);
+                return true;
+            } catch (e) {
+                console.error('Échec de la synchronisation initiale. Utilisation des données locales/mock.', e);
+                return false;
+            }
+        }
+    };
+
+    // Initialisation : Synchronisation avec le backend NestJS
+    DataSync.pullAll();
+
     let currentPage = 'dashboard';
     let currentCalMonth = new Date().getMonth();
     let currentCalYear = new Date().getFullYear();
@@ -166,6 +218,15 @@
 
     // ---- Dashboard ----
     function renderDashboard() {
+        if (!MEMBERS || MEMBERS.length === 0) {
+            // Afficher des valeurs par défaut si pas de membres (évite division par zéro)
+            document.getElementById('stat-active-members').textContent = '0';
+            document.getElementById('stat-sessions-month').textContent = '0';
+            document.getElementById('stat-avg-attendance').textContent = '0%';
+            document.getElementById('stat-win-rate').textContent = '0%';
+            return;
+        }
+
         const activeMembers = MEMBERS.filter(m => m.status === 'active');
         const thisMonth = new Date().getMonth();
         const thisYear = new Date().getFullYear();
@@ -173,14 +234,77 @@
             const d = new Date(e.date);
             return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
         });
-        const avgAttendance = Math.round(activeMembers.reduce((s, m) => s + m.attendance, 0) / activeMembers.length);
-        const totalIncome = TRANSACTIONS.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+        
+        const totalAttendance = activeMembers.reduce((s, m) => s + (m.attendance || 0), 0);
+        const avgAttendance = activeMembers.length > 0 ? Math.round(totalAttendance / activeMembers.length) : 0;
+        
+        // Sports Stats Calculation
+        const playedMatches = EVENTS.filter(e => e.type === 'match' && e.result && e.result !== 'pending');
+        const wins = playedMatches.filter(e => e.result === 'win').length;
+        const winRate = playedMatches.length > 0 ? Math.round((wins / playedMatches.length) * 100) : 0;
 
-        // Animate stats counters
+        // Scorer & Assist Rankings
+        const scorersMap = {};
+        const assistsMap = {};
+
+        const processStat = (statField, map) => {
+            if (!statField) return;
+            if (typeof statField[0] === 'object') {
+                statField.forEach(s => map[s.memberId] = (map[s.memberId] || 0) + s.count);
+            } else {
+                statField.forEach(id => map[id] = (map[id] || 0) + 1);
+            }
+        };
+
+        EVENTS.forEach(e => {
+            processStat(e.scorersGreen, scorersMap);
+            processStat(e.scorersOrange, scorersMap);
+            processStat(e.scorers, scorersMap); // Legacy compatibility
+            
+            processStat(e.assistsGreen, assistsMap);
+            processStat(e.assistsOrange, assistsMap);
+            processStat(e.assists, assistsMap);
+        });
+
+        const getTopRanking = (map) => {
+            return Object.entries(map)
+                .map(([id, count]) => ({ member: MEMBERS.find(m => m.id == id), count }))
+                .filter(item => item.member)
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 5);
+        };
+
+        const topScorers = getTopRanking(scorersMap);
+        const topAssists = getTopRanking(assistsMap);
+
+        // Update Dashboard Stats
         animateCounter('stat-members-count', activeMembers.length);
         animateCounter('stat-sessions-count', sessionsThisMonth.length);
         document.getElementById('stat-attendance-rate').textContent = avgAttendance + '%';
-        document.getElementById('stat-revenue-total').textContent = formatCurrency(totalIncome);
+        document.getElementById('stat-winrate-value').textContent = winRate + '%';
+        document.getElementById('stat-matches-count').textContent = playedMatches.length + ' m.';
+
+        // Render Rankings
+        const renderRankList = (elId, list, label) => {
+            const el = document.getElementById(elId);
+            if (!list.length) {
+                el.innerHTML = `<li class="ranking-empty">Aucune donnée disponible</li>`;
+                return;
+            }
+            el.innerHTML = list.map((item, index) => `
+                <li class="ranking-item">
+                    <div class="ranking-pos">${index + 1}</div>
+                    <div class="ranking-member">
+                        <div class="member-avatar-xs" style="background:${getAvatarColor(item.member.id)}">${getInitials(item.member.firstName, item.member.lastName)}</div>
+                        <span>${item.member.firstName} ${item.member.lastName}</span>
+                    </div>
+                    <div class="ranking-count"><strong>${item.count}</strong> ${label}</div>
+                </li>
+            `).join('');
+        };
+
+        renderRankList('top-scorers-list', topScorers, 'buts');
+        renderRankList('top-assists-list', topAssists, 'p.');
 
         // Attendance chart
         Charts.renderAttendanceChart('attendance-chart', WEEKLY_ATTENDANCE);
@@ -198,7 +322,7 @@
                         <span class="month">${MONTHS_FR[d.getMonth()].slice(0, 3)}</span>
                     </div>
                     <div class="event-info">
-                        <div class="event-title">${e.title}</div>
+                        <div class="event-title">${e.title} ${e.score ? `<span class="event-score-tag">${e.score}</span>` : ''}</div>
                         <div class="event-meta">
                             <span class="material-icons-round">schedule</span>${e.time} · ${e.duration}
                             <span class="material-icons-round" style="margin-left:6px">place</span>${e.location}
@@ -224,6 +348,7 @@
 
         // Finance summary
         const finSummary = document.getElementById('finance-summary');
+        const totalIncome = TRANSACTIONS.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
         const totalExpenses = Math.abs(TRANSACTIONS.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0));
         const pendingDues = MEMBERS.filter(m => m.dues === 'unpaid' || m.dues === 'partial').length * 250;
         const balance = totalIncome - totalExpenses;
@@ -242,7 +367,7 @@
                 <span class="finance-row-value" style="color:var(--accent-amber)">${formatCurrency(pendingDues)}</span>
             </div>
             <div class="finance-progress-bar">
-                <div class="finance-progress-fill" style="width:0%; background:var(--gradient-emerald)" data-width="${Math.round((totalIncome / (totalIncome + totalExpenses)) * 100)}%"></div>
+                <div class="finance-progress-fill" style="width:0%; background:var(--gradient-emerald)" data-width="${Math.round((totalIncome / ((totalIncome + totalExpenses) || 1)) * 100)}%"></div>
             </div>
             <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-tertiary)">
                 <span>Solde: <strong style="color:${balance >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)'}">${formatCurrency(balance)}</strong></span>
@@ -290,8 +415,7 @@
             let filtered = MEMBERS.filter(m => {
                 const matchSearch = !query || `${m.firstName} ${m.lastName} ${m.email}`.toLowerCase().includes(query);
                 const matchStatus = status === 'all' || m.status === status;
-                const matchCategory = category === 'all' || m.category === category;
-                return matchSearch && matchStatus && matchCategory;
+                return matchSearch && matchStatus;
             });
 
             const tbody = document.getElementById('members-table-body');
@@ -308,7 +432,6 @@
                                 </div>
                             </div>
                         </td>
-                        <td>${getCategoryLabel(m.category)}</td>
                         <td><span class="status-badge ${m.status}">${getStatusLabel(m.status)}</span></td>
                         <td><span class="status-badge ${m.dues}">${getDuesLabel(m.dues)}</span></td>
                         <td>
@@ -360,15 +483,6 @@
                     <label for="mf-email">Email</label>
                     <input type="email" id="mf-email" class="form-input" value="${m.email}" required>
                 </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div class="form-group">
-                        <label for="mf-category">Catégorie</label>
-                        <select id="mf-category" class="form-select">
-                            <option value="senior" ${m.category === 'senior' ? 'selected' : ''}>Senior</option>
-                            <option value="junior" ${m.category === 'junior' ? 'selected' : ''}>Junior</option>
-                            <option value="veteran" ${m.category === 'veteran' ? 'selected' : ''}>Vétéran</option>
-                        </select>
-                    </div>
                     <div class="form-group">
                         <label for="mf-status">Statut</label>
                         <select id="mf-status" class="form-select">
@@ -388,34 +502,29 @@
 
     function setupMemberForm(memberId = null) {
         const form = document.getElementById('member-form');
-        form.addEventListener('submit', (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (memberId) {
-                const member = MEMBERS.find(m => m.id === memberId);
-                if (member) {
-                    member.firstName = document.getElementById('mf-first').value;
-                    member.lastName = document.getElementById('mf-last').value;
-                    member.email = document.getElementById('mf-email').value;
-                    member.category = document.getElementById('mf-category').value;
-                    member.status = document.getElementById('mf-status').value;
-                    showToast('Membre mis à jour avec succès', 'success');
+            
+            const memberData = {
+                firstName: document.getElementById('mf-first').value,
+                lastName: document.getElementById('mf-last').value,
+                email: document.getElementById('mf-email').value,
+                status: document.getElementById('mf-status').value,
+            };
+
+            try {
+                if (memberId) {
+                    await Api.put(`/members/${memberId}`, memberData);
+                    showToast('Membre mis à jour', 'success');
+                } else {
+                    await Api.post('/members', memberData);
+                    showToast('Membre ajouté avec succès', 'success');
                 }
-            } else {
-                MEMBERS.push({
-                    id: MEMBERS.length + 1,
-                    firstName: document.getElementById('mf-first').value,
-                    lastName: document.getElementById('mf-last').value,
-                    email: document.getElementById('mf-email').value,
-                    category: document.getElementById('mf-category').value,
-                    status: document.getElementById('mf-status').value,
-                    dues: 'unpaid',
-                    attendance: 0,
-                    joinDate: new Date().toISOString().slice(0, 10)
-                });
-                showToast('Membre ajouté avec succès', 'success');
+                closeModal();
+                await DataSync.pullAll();
+            } catch (err) {
+                console.error(err);
             }
-            closeModal();
-            renderMembers();
         });
     }
 
@@ -473,7 +582,72 @@
             html += `<div class="cal-day ${isToday ? 'today' : ''}">`;
             html += `<span class="cal-day-number">${d}</span>`;
             dayEvents.forEach(e => {
-                html += `<div class="cal-event ${e.type}" title="${e.title} — ${e.time}">${e.time} ${e.title}</div>`;
+                if (e.type === 'match') {
+                    const hasPassed = dateStr <= todayStr;
+                    
+                    let sg = e.scoreGreen;
+                    let so = e.scoreOrange;
+                    if (sg === undefined || so === undefined || sg === '' || so === '') {
+                        if (e.score) {
+                            const parts = e.score.split('-');
+                            sg = parts[0]?.trim() || '0';
+                            so = parts[1]?.trim() || '0';
+                        } else {
+                            sg = '0';
+                            so = '0';
+                        }
+                    }
+
+                    let displayScore = hasPassed ? `${sg} - ${so}` : `0 - 0`;
+                    const eventText = `Vert [${displayScore}] Orange`;
+                    
+                    let tooltipHtml = '';
+                    if (hasPassed) {
+                         const getNames = (scorersArr) => {
+                             if (!scorersArr || !scorersArr.length) return '';
+                             
+                             // Support pour tableau d'IDs (API) ou tableau d'objets (Legacy/Mock)
+                             let processed = [];
+                             if (typeof scorersArr[0] === 'object') {
+                                 processed = scorersArr;
+                             } else {
+                                 // Compter les occurrences pour les IDs plats
+                                 const counts = {};
+                                 scorersArr.forEach(id => counts[id] = (counts[id] || 0) + 1);
+                                 processed = Object.entries(counts).map(([id, count]) => ({ memberId: id, count }));
+                             }
+
+                             return processed.map(s => {
+                                 const m = MEMBERS.find(x => x.id == s.memberId);
+                                 const name = m ? `${m.firstName} ${m.lastName}` : `Anonyme`;
+                                 return s.count > 1 ? `${name} (x${s.count})` : name;
+                             }).join(', ');
+                         };
+                         const verts = getNames(e.scorersGreen) || 'Aucun'; 
+                         const oranges = getNames(e.scorersOrange) || 'Aucun';
+
+                         tooltipHtml = `
+                             <div class="match-tooltip">
+                                 <div class="tooltip-score">${displayScore}</div>
+                                 <div class="tooltip-team tooltip-vert">
+                                    <span class="icon">⚽</span> Verts :
+                                    <span class="tooltip-team-body">${verts}</span>
+                                 </div>
+                                 <div class="tooltip-team tooltip-orange">
+                                    <span class="icon">⚽</span> Oranges :
+                                    <span class="tooltip-team-body">${oranges}</span>
+                                 </div>
+                             </div>
+                         `;
+                    }
+                    
+                    html += `<div class="cal-event cal-event-match ${e.result || ''}" onclick="SportFlow.editEvent(${e.id})">
+                                ${eventText}
+                                ${tooltipHtml}
+                             </div>`;
+                } else {
+                    html += `<div class="cal-event ${e.type}" onclick="SportFlow.editEvent(${e.id})" title="${e.title} — ${e.time}">${e.title}</div>`;
+                }
             });
             html += '</div>';
         }
@@ -488,66 +662,223 @@
         body.innerHTML = html;
     }
 
-    function getEventFormHTML() {
+    function getEventFormHTML(event = null) {
+        const e = event || { date: '', time: '09:30', endTime: '13:30', type: 'match', location: '', result: '', scoreGreen: '', scoreOrange: '', scorersGreen: [], assistsGreen: [], scorersOrange: [], assistsOrange: [] };
+        const isMatch = e.type === 'match';
+
+        const generateTags = (ids, category) => {
+            if (!ids) return '';
+            const idArray = ids.split(',').filter(id => id.trim() !== '');
+            return idArray.map(id => {
+                const member = MEMBERS.find(m => m.id == id);
+                const name = member ? `${member.firstName} ${member.lastName}` : `ID: ${id}`;
+                return `<div class="stat-badge">${name} <span class="badge-remove" onclick="SportFlow.removeStat('${category}', ${id}, this)">×</span></div>`;
+            }).join('');
+        };
+
+        const generateStatSection = (label, category, data) => {
+            const idsStr = data ? data.flatMap(item => Array(item.count).fill(item.memberId)).join(',') : '';
+            return `
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label style="font-size:0.75rem; display:flex; align-items:center;">
+                        ${label} 
+                        <span class="btn-add-stat" onclick="SportFlow.showStatPicker('${category}')">
+                            <span class="material-icons-round" style="font-size:14px">add</span>
+                        </span>
+                    </label>
+                    <div id="tags-${category}" class="stat-tags-container">
+                        ${generateTags(idsStr, category)}
+                    </div>
+                    <input type="hidden" id="ef-${category}" value="${idsStr}">
+                    <div id="picker-${category}" class="stat-picker-container" style="display:none;">
+                        <select class="form-select stat-picker-select" onchange="SportFlow.addStat('${category}', this.value, this.options[this.selectedIndex].text); this.value=''; this.parentNode.style.display='none'">
+                            <option value="">Sélectionner un joueur...</option>
+                            ${MEMBERS.map(m => `<option value="${m.id}">${m.firstName} ${m.lastName}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+            `;
+        };
+
         return `
             <form id="event-form" class="modal-form">
-                <div class="form-group">
-                    <label for="ef-title">Titre</label>
-                    <input type="text" id="ef-title" class="form-input" placeholder="Ex: Entraînement collectif" required>
-                </div>
+                <style>
+                    .score-input:focus { border-color: var(--accent-blue) !important; box-shadow: 0 0 0 3px var(--accent-blue-light) !important; outline: none; }
+                    .score-input::-webkit-outer-spin-button, .score-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+                    .score-input[type=number] { -moz-appearance: textfield; }
+                    .stat-tags-container { display:flex; flex-wrap:wrap; gap:6px; min-height:36px; padding:6px; border:1px solid var(--border-color); border-radius:var(--radius-sm); background:var(--bg-primary); margin-bottom:4px; }
+                    .stat-badge { display:inline-flex; align-items:center; background:var(--bg-secondary); border:1px solid var(--border-color); padding:2px 8px; border-radius:12px; font-size:0.7rem; color:var(--text-primary); font-weight:600;}
+                    .stat-badge .badge-remove { margin-left:6px; cursor:pointer; font-weight:bold; color:var(--text-secondary); display:flex; align-items:center; }
+                    .stat-badge .badge-remove:hover { color:var(--accent-rose); }
+                    .btn-add-stat { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:var(--accent-blue); color:white; cursor:pointer; margin-left:8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                    .btn-add-stat:hover { opacity:0.8; }
+                    .stat-picker-container { margin-top:4px; }
+                    .stat-picker-select { padding:4px 8px; font-size:0.8rem; border-radius:var(--radius-sm); }
+                </style>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
                     <div class="form-group">
                         <label for="ef-date">Date</label>
-                        <input type="date" id="ef-date" class="form-input" required>
+                        <input type="date" id="ef-date" class="form-input" value="${e.date}" required>
                     </div>
                     <div class="form-group">
-                        <label for="ef-time">Heure</label>
-                        <input type="time" id="ef-time" class="form-input" required>
+                        <label for="ef-type">Type</label>
+                        <select id="ef-type" class="form-select" onchange="const s = document.getElementById('match-results-fields'); this.value==='match' ? s.style.display='block' : s.style.display='none'">
+                            <option value="training" ${e.type === 'training' ? 'selected' : ''}>Entraînement</option>
+                            <option value="match" ${e.type === 'match' ? 'selected' : ''}>Match</option>
+                            <option value="tournament" ${e.type === 'tournament' ? 'selected' : ''}>Tournoi</option>
+                        </select>
                     </div>
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
                     <div class="form-group">
-                        <label for="ef-type">Type</label>
-                        <select id="ef-type" class="form-select">
-                            <option value="training">Entraînement</option>
-                            <option value="match">Match</option>
-                            <option value="tournament">Tournoi</option>
-                            <option value="meeting">Réunion</option>
-                        </select>
+                        <label for="ef-time">Heure de début</label>
+                        <input type="time" id="ef-time" class="form-input" value="${e.time || '09:30'}" required>
                     </div>
                     <div class="form-group">
-                        <label for="ef-duration">Durée</label>
-                        <input type="text" id="ef-duration" class="form-input" placeholder="Ex: 1h30">
+                        <label for="ef-endtime">Heure de fin</label>
+                        <input type="time" id="ef-endtime" class="form-input" value="${e.endTime || '13:30'}" required>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="ef-location">Lieu</label>
-                    <input type="text" id="ef-location" class="form-input" placeholder="Ex: Gymnase A">
+                    <input type="text" id="ef-location" class="form-input" value="${e.location || ''}" placeholder="Ex: Stade AS FIVE">
                 </div>
-                <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:8px;">
-                    <span class="material-icons-round">add</span>
-                    Créer l'événement
+                
+                <div id="match-results-fields" style="display:${isMatch ? 'block' : 'none'}; border:1px solid var(--border-color); padding:16px; border-radius:var(--radius-md); margin-top:12px; background:var(--bg-tertiary)">
+                    <h4 style="font-size:0.9rem; margin-bottom:16px; color:var(--text-primary); text-align:center;">Feuille de match</h4>
+                    
+                    <div class="form-group">
+                        <label for="ef-result">Résultat du match (AS FIVE)</label>
+                        <select id="ef-result" class="form-select">
+                            <option value="">Non joué</option>
+                            <option value="win" ${e.result === 'win' ? 'selected' : ''}>Victoire</option>
+                            <option value="draw" ${e.result === 'draw' ? 'selected' : ''}>Nul</option>
+                            <option value="loss" ${e.result === 'loss' ? 'selected' : ''}>Défaite</option>
+                        </select>
+                    </div>
+
+                    <div class="scoreboard-container" style="display:flex; align-items:center; justify-content:center; gap:20px; margin-bottom:24px; padding:20px; background:var(--bg-secondary); border-radius:var(--radius-md); box-shadow:var(--shadow-sm);">
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                            <div style="width:48px; height:48px; border-radius:50%; background:var(--accent-emerald); display:flex; align-items:center; justify-content:center; color:white; font-size:1.2rem; font-weight:bold; box-shadow:0 4px 10px rgba(16,185,129,0.3);">V</div>
+                            <span style="font-size:0.75rem; font-weight:700; color:var(--accent-emerald);">VERTS</span>
+                        </div>
+                        
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <input type="number" id="ef-score-green" class="form-input score-input" value="${e.scoreGreen || ''}" placeholder="0" min="0" style="width:64px; height:64px; font-size:2rem; text-align:center; font-weight:800; border:2px solid var(--border-color); border-radius:var(--radius-sm); color:var(--text-primary);">
+                            <span style="font-size:1.5rem; font-weight:bold; color:var(--text-tertiary);">:</span>
+                            <input type="number" id="ef-score-orange" class="form-input score-input" value="${e.scoreOrange || ''}" placeholder="0" min="0" style="width:64px; height:64px; font-size:2rem; text-align:center; font-weight:800; border:2px solid var(--border-color); border-radius:var(--radius-sm); color:var(--text-primary);">
+                        </div>
+
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                            <div style="width:48px; height:48px; border-radius:50%; background:var(--accent-amber); display:flex; align-items:center; justify-content:center; color:white; font-size:1.2rem; font-weight:bold; box-shadow:0 4px 10px rgba(245,158,11,0.3);">O</div>
+                            <span style="font-size:0.75rem; font-weight:700; color:var(--accent-amber);">ORANGES</span>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                        <!-- VERTS -->
+                        <div style="padding:16px; border:1px solid rgba(16,185,129,0.2); border-radius:var(--radius-md); background:rgba(16,185,129,0.02);">
+                            <h5 style="color:var(--accent-emerald); font-size:0.85rem; margin-bottom:12px; display:flex; align-items:center; gap:6px; font-weight:700;"><span class="material-icons-round" style="font-size:18px;">security</span> ÉQUIPE VERTE</h5>
+                            ${generateStatSection('Buteurs', 'scorers-green', e.scorersGreen)}
+                            ${generateStatSection('Passeurs', 'assists-green', e.assistsGreen)}
+                        </div>
+
+                        <!-- ORANGES -->
+                        <div style="padding:16px; border:1px solid rgba(245,158,11,0.2); border-radius:var(--radius-md); background:rgba(245,158,11,0.02);">
+                            <h5 style="color:var(--accent-amber); font-size:0.85rem; margin-bottom:12px; display:flex; align-items:center; gap:6px; font-weight:700;"><span class="material-icons-round" style="font-size:18px;">security</span> ÉQUIPE ORANGE</h5>
+                            ${generateStatSection('Buteurs', 'scorers-orange', e.scorersOrange)}
+                            ${generateStatSection('Passeurs', 'assists-orange', e.assistsOrange)}
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:16px;">
+                    <span class="material-icons-round">save</span>
+                    ${event ? 'Enregistrer les modifications' : 'Créer l\'événement'}
                 </button>
             </form>
         `;
     }
 
-    function setupEventForm() {
+    function setupEventForm(eventId = null) {
         const form = document.getElementById('event-form');
-        form.addEventListener('submit', (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            EVENTS.push({
-                id: EVENTS.length + 1,
-                title: document.getElementById('ef-title').value,
-                type: document.getElementById('ef-type').value,
+            
+            const parseStats = (str) => {
+                if (!str) return [];
+                const ids = str.split(',').map(s => parseInt(s.trim())).filter(id => !isNaN(id));
+                const counts = {};
+                ids.forEach(id => counts[id] = (counts[id] || 0) + 1);
+                return Object.entries(counts).map(([id, count]) => ({ memberId: parseInt(id), count }));
+            };
+
+            const t1 = document.getElementById('ef-time').value;
+            const t2 = document.getElementById('ef-endtime').value;
+            let durationStr = '4h';
+            if (t1 && t2) {
+                const [h1, m1] = t1.split(':').map(Number);
+                const [h2, m2] = t2.split(':').map(Number);
+                let diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+                if (diff < 0) diff += 24 * 60;
+                const dh = Math.floor(diff / 60);
+                const dm = diff % 60;
+                durationStr = dm > 0 ? `${dh}h${dm.toString().padStart(2, '0')}` : `${dh}h`;
+            }
+
+            const type = document.getElementById('ef-type').value;
+            const titleMap = {
+                'match': 'Match Maintien',
+                'training': 'Entraînement',
+                'tournament': 'Tournoi Régional',
+                'meeting': 'Réunion'
+            };
+
+            const sg = document.getElementById('ef-score-green')?.value || '';
+            const so = document.getElementById('ef-score-orange')?.value || '';
+            const scoreStr = (sg !== '' && so !== '') ? `${sg} - ${so}` : '';
+
+            const scorersG = parseStats(document.getElementById('ef-scorers-green')?.value);
+            const scorersO = parseStats(document.getElementById('ef-scorers-orange')?.value);
+            const assistsG = parseStats(document.getElementById('ef-assists-green')?.value);
+            const assistsO = parseStats(document.getElementById('ef-assists-orange')?.value);
+
+            const mergeStats = (a1, a2) => {
+                return [...a1, ...a2].reduce((acc, curr) => {
+                    const existing = acc.find(x => x.memberId === curr.memberId);
+                    if (existing) existing.count += curr.count;
+                    else acc.push(curr);
+                    return acc;
+                }, []);
+            };
+
+            const eventData = {
+                title: titleMap[type] || 'Événement',
+                type: type,
                 date: document.getElementById('ef-date').value,
-                time: document.getElementById('ef-time').value,
-                duration: document.getElementById('ef-duration').value || '1h',
-                location: document.getElementById('ef-location').value || 'À définir'
-            });
-            closeModal();
-            renderCalendar();
-            showToast('Événement créé avec succès', 'success');
+                time: t1,
+                location: document.getElementById('ef-location').value || 'Stade AS FIVE',
+                scoreGreen: sg === '' ? 0 : parseInt(sg),
+                scoreOrange: so === '' ? 0 : parseInt(so),
+                scorersGreen: document.getElementById('ef-scorers-green')?.value.split(',').filter(x => x),
+                scorersOrange: document.getElementById('ef-scorers-orange')?.value.split(',').filter(x => x),
+                assistsGreen: document.getElementById('ef-assists-green')?.value.split(',').filter(x => x),
+                assistsOrange: document.getElementById('ef-assists-orange')?.value.split(',').filter(x => x),
+            };
+
+            try {
+                if (eventId) {
+                    await Api.put(`/events/${eventId}`, eventData);
+                    showToast('Événement mis à jour', 'success');
+                } else {
+                    await Api.post('/events', eventData);
+                    showToast('Événement créé', 'success');
+                }
+                closeModal();
+                await DataSync.pullAll();
+            } catch (err) {
+                console.error(err);
+            }
         });
     }
 
@@ -633,21 +964,27 @@
 
     function setupTransactionForm() {
         const form = document.getElementById('transaction-form');
-        form.addEventListener('submit', (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const type = document.getElementById('tf-type').value;
             const amount = parseFloat(document.getElementById('tf-amount').value);
-            TRANSACTIONS.push({
-                id: TRANSACTIONS.length + 1,
+            
+            const transactionData = {
                 date: document.getElementById('tf-date').value,
                 description: document.getElementById('tf-desc').value,
                 category: document.getElementById('tf-category').value || 'Autre',
                 amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount),
                 type: type
-            });
-            closeModal();
-            renderFinances();
-            showToast('Transaction ajoutée', 'success');
+            };
+
+            try {
+                await Api.post('/finances', transactionData);
+                closeModal();
+                await DataSync.pullAll();
+                showToast('Transaction ajoutée', 'success');
+            } catch (err) {
+                console.error(err);
+            }
         });
     }
 
@@ -705,6 +1042,34 @@
     // ============================================
 
     window.SportFlow = {
+        showStatPicker(category) {
+            const picker = document.getElementById(`picker-${category}`);
+            if (picker) picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+        },
+        addStat(category, memberId, memberName) {
+            if (!memberId) return;
+            const hiddenInput = document.getElementById(`ef-${category}`);
+            const tagsContainer = document.getElementById(`tags-${category}`);
+            
+            const currentVals = hiddenInput.value ? hiddenInput.value.split(',') : [];
+            currentVals.push(memberId);
+            hiddenInput.value = currentVals.join(',');
+            
+            const badge = document.createElement('div');
+            badge.className = 'stat-badge';
+            badge.innerHTML = `${memberName} <span class="badge-remove" onclick="SportFlow.removeStat('${category}', ${memberId}, this)">×</span>`;
+            tagsContainer.appendChild(badge);
+        },
+        removeStat(category, memberId, el) {
+            const hiddenInput = document.getElementById(`ef-${category}`);
+            let currentVals = hiddenInput.value ? hiddenInput.value.split(',') : [];
+            const index = currentVals.indexOf(memberId.toString());
+            if (index > -1) {
+                currentVals.splice(index, 1);
+                hiddenInput.value = currentVals.join(',');
+                el.parentElement.remove();
+            }
+        },
         viewMember(id) {
             const m = MEMBERS.find(m => m.id === id);
             if (!m) return;
@@ -716,10 +1081,6 @@
                     <p style="color:var(--text-secondary); font-size:0.85rem;">${m.email}</p>
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                    <div style="text-align:center; padding:12px; background:var(--bg-tertiary); border-radius:var(--radius-md);">
-                        <div style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:4px;">Catégorie</div>
-                        <div style="font-weight:700;">${getCategoryLabel(m.category)}</div>
-                    </div>
                     <div style="text-align:center; padding:12px; background:var(--bg-tertiary); border-radius:var(--radius-md);">
                         <div style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:4px;">Statut</div>
                         <div><span class="status-badge ${m.status}">${getStatusLabel(m.status)}</span></div>
@@ -744,6 +1105,13 @@
             if (!m) return;
             openModal(`Modifier — ${m.firstName} ${m.lastName}`, getMemberFormHTML(m));
             setupMemberForm(id);
+        },
+
+        editEvent(id) {
+            const e = EVENTS.find(ev => ev.id === id);
+            if (!e) return;
+            openModal(`Modifier — ${e.title}`, getEventFormHTML(e));
+            setupEventForm(id);
         }
     };
 

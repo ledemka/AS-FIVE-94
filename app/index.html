@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Application de gestion pour association sportive — membres, planning, finances et statistiques.">
-    <title>SportFlow — Gestion Association Sportive</title>
+    <meta name="description" content="Application de gestion pour AS FIVE 94 — membres, planning, finances et statistiques.">
+    <title>AS FIVE 94 — Gestion Association Sportive</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -16,8 +16,9 @@
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="logo">
-                <span class="logo-icon material-icons-round">sports_soccer</span>
-                <span class="logo-text">SportFlow</span>
+                <img src="img/logo.png" alt="AS FIVE 94" class="logo-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                <div class="logo-fallback logo-icon material-icons-round">sports_soccer</div>
+                <span class="logo-text">AS FIVE 94</span>
             </div>
             <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
                 <span class="material-icons-round">menu</span>
@@ -141,17 +142,17 @@
                             <span>-3%</span>
                         </div>
                     </div>
-                    <div class="stat-card" id="stat-revenue">
-                        <div class="stat-icon purple">
-                            <span class="material-icons-round">euro</span>
+                    <div class="stat-card" id="stat-winrate">
+                        <div class="stat-icon blue">
+                            <span class="material-icons-round">emoji_events</span>
                         </div>
                         <div class="stat-info">
-                            <span class="stat-value" id="stat-revenue-total">0 €</span>
-                            <span class="stat-label">Recettes totales</span>
+                            <span class="stat-value" id="stat-winrate-value">0%</span>
+                            <span class="stat-label">Victoires</span>
                         </div>
                         <div class="stat-trend up">
-                            <span class="material-icons-round">trending_up</span>
-                            <span>+8%</span>
+                            <span class="material-icons-round">analytics</span>
+                            <span id="stat-matches-count">0 m.</span>
                         </div>
                     </div>
                 </div>
@@ -178,6 +179,32 @@
                         </div>
                         <div class="card-body">
                             <ul class="event-list" id="upcoming-events-list">
+                                <!-- Populated by JS -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sport Stats Row -->
+                <div class="dashboard-grid">
+                    <div class="card" id="top-scorers-card">
+                        <div class="card-header">
+                            <h2>Classement Buteurs</h2>
+                            <span class="material-icons-round text-amber" style="font-size:20px">military_tech</span>
+                        </div>
+                        <div class="card-body">
+                            <ul class="ranking-list" id="top-scorers-list">
+                                <!-- Populated by JS -->
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="card" id="top-assists-card">
+                        <div class="card-header">
+                            <h2>Classement Passeurs</h2>
+                            <span class="material-icons-round text-blue" style="font-size:20px">assistant</span>
+                        </div>
+                        <div class="card-body">
+                            <ul class="ranking-list" id="top-assists-list">
                                 <!-- Populated by JS -->
                             </ul>
                         </div>
@@ -226,11 +253,9 @@
                                 <option value="inactive">Inactif</option>
                                 <option value="pending">En attente</option>
                             </select>
-                            <select class="filter-select" id="member-category-filter">
-                                <option value="all">Toutes catégories</option>
+                            <!-- Catégorie masquée car uniquement Senior -->
+                            <select class="filter-select" id="member-category-filter" style="display:none">
                                 <option value="senior">Senior</option>
-                                <option value="junior">Junior</option>
-                                <option value="veteran">Vétéran</option>
                             </select>
                         </div>
                     </div>
@@ -245,7 +270,6 @@
                         <thead>
                             <tr>
                                 <th>Membre</th>
-                                <th>Catégorie</th>
                                 <th>Statut</th>
                                 <th>Cotisation</th>
                                 <th>Présence</th>
@@ -280,10 +304,8 @@
                                 <span class="material-icons-round">chevron_right</span>
                             </button>
                         </div>
-                        <div class="view-toggle">
+                        <div class="view-toggle" style="display:none;">
                             <button class="view-btn active" data-view="month" id="view-month">Mois</button>
-                            <button class="view-btn" data-view="week" id="view-week">Semaine</button>
-                            <button class="view-btn" data-view="list" id="view-list">Liste</button>
                         </div>
                     </div>
                     <button class="btn btn-primary" id="add-event-btn">
