@@ -5,6 +5,7 @@ import { join } from 'path';
 import { MembersModule } from './members/members.module';
 import { EventsModule } from './events/events.module';
 import { FinancesModule } from './finances/finances.module';
+import { ImportModule } from './import/import.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -22,6 +23,7 @@ import { HealthController } from './health.controller';
     MembersModule,
     EventsModule,
     FinancesModule,
+    ImportModule,
   ],
   controllers: [HealthController],
 })

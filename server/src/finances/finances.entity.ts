@@ -29,6 +29,10 @@ export class Transaction {
 
   @ApiProperty({ required: false })
   @Column({ nullable: true })
+  paymentMethod: string; // 'HelloAsso', 'Paypal', 'Espece'
+
+  @ApiProperty({ required: false })
+  @Column({ nullable: true })
   paypalTransactionId: string;
 
   // Relation avec un membre (ex: pour le paiement des cotisations)

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, Delete, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { FinancesService } from './finances.service';
 import { Transaction } from './finances.entity';
@@ -24,5 +24,11 @@ export class FinancesController {
   @ApiOperation({ summary: 'Enregistrer une nouvelle transaction' })
   create(@Body() transactionData: Partial<Transaction>): Promise<Transaction> {
     return this.financesService.create(transactionData);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Supprimer une transaction' })
+  remove(@Param('id') id: string): Promise<void> {
+    return this.financesService.remove(+id);
   }
 }

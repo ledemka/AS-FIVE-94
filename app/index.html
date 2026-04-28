@@ -90,6 +90,9 @@
                     <span class="material-icons-round">search</span>
                     <input type="text" placeholder="Rechercher..." id="global-search" autocomplete="off">
                 </div>
+                <button class="icon-btn sync-btn" id="sync-google-btn" title="Synchroniser Google Sheets">
+                    <span class="material-icons-round">sync</span>
+                </button>
                 <button class="icon-btn notification-btn" id="notification-btn" aria-label="Notifications">
                     <span class="material-icons-round">notifications</span>
                     <span class="notification-badge">3</span>
@@ -133,18 +136,9 @@
                             <span>+5%</span>
                         </div>
                     </div>
-                    <div class="stat-card" id="stat-attendance">
-                        <div class="stat-icon amber">
-                            <span class="material-icons-round">how_to_reg</span>
-                        </div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="stat-attendance-rate">0%</span>
-                            <span class="stat-label">Taux de présence</span>
-                        </div>
-                        <div class="stat-trend down">
-                            <span class="material-icons-round">trending_down</span>
-                            <span>-3%</span>
-                        </div>
+                    <div class="stat-card" id="stat-funds-distribution" style="display:flex; flex-direction:column; justify-content:center; padding:16px;">
+                        <span class="stat-label" style="font-weight:600; margin-bottom:2px; color:var(--text-primary); font-size:0.85rem;">Origine des fonds</span>
+                        <div id="funds-distribution-chart" style="width:100%;"></div>
                     </div>
                     <div class="stat-card" id="stat-winrate">
                         <div class="stat-icon blue">
@@ -264,7 +258,6 @@
                             <select class="filter-select-mini" id="member-dues-filter">
                                 <option value="all">Cotisation</option>
                                 <option value="paid">Payée</option>
-                                <option value="unpaid">Impayée</option>
                                 <option value="pending">En cours</option>
                             </select>
                         </div>
@@ -302,8 +295,9 @@
                                 <th>Statut Global</th>
                                 <th>Inscription</th>
                                 <th>Cotisation</th>
-                                <th>Présence</th>
-                                <th>Date d'adhésion</th>
+                                <th style="cursor:pointer;" id="sort-by-paid" title="Trier par reste à payer">
+                                    Reste à payer <span class="material-icons-round sort-icon" style="font-size:16px; vertical-align:middle;">unfold_more</span>
+                                </th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -366,7 +360,7 @@
                 <div class="stats-grid">
                     <div class="stat-card" id="fin-income">
                         <div class="stat-icon emerald">
-                            <span class="material-icons-round">arrow_downward</span>
+                            <span class="material-icons-round">arrow_upward</span>
                         </div>
                         <div class="stat-info">
                             <span class="stat-value" id="fin-income-value">0 €</span>
@@ -375,7 +369,7 @@
                     </div>
                     <div class="stat-card" id="fin-expenses">
                         <div class="stat-icon rose">
-                            <span class="material-icons-round">arrow_upward</span>
+                            <span class="material-icons-round">arrow_downward</span>
                         </div>
                         <div class="stat-info">
                             <span class="stat-value" id="fin-expenses-value">0 €</span>
@@ -402,6 +396,12 @@
                     </div>
                 </div>
 
+
+
+                <div class="finance-compact-row" id="finance-payment-summary-row" style="margin-bottom: 20px;">
+                    <!-- Populated by JS: Summary by payment type -->
+                </div>
+
                 <div class="dashboard-grid">
                     <div class="card chart-card" id="finance-chart-card">
                         <div class="card-header">
@@ -413,6 +413,10 @@
                         </div>
                         <div class="card-body">
                             <div class="chart-container" id="finance-chart"></div>
+                            <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                                <span class="stat-label" style="font-weight:600; display:block; margin-bottom:8px; color:var(--text-primary);">Origine des fonds globaux</span>
+                                <div id="finances-page-funds-distribution-chart" style="width:100%;"></div>
+                            </div>
                         </div>
                     </div>
                     <div class="card" id="finance-breakdown-card">
@@ -430,15 +434,10 @@
                 <div class="card" id="transactions-card">
                     <div class="card-header">
                         <h2>Dernières transactions</h2>
-                        <button class="btn btn-primary btn-sm" id="add-transaction-btn">
-                            <span class="material-icons-round">add</span>
-                            Nouvelle transaction
-                        </button>
                     </div>
                     <div class="card-body">
                         <table class="data-table" id="transactions-table">
                             <thead>
-                                <tr>
                                     <th>Date</th>
                                     <th>Description</th>
                                     <th>Catégorie</th>
@@ -450,6 +449,11 @@
                                 <!-- Populated by JS -->
                             </tbody>
                         </table>
+                        <div class="table-footer" id="transactions-table-footer" style="margin-top: 15px; display: flex; justify-content: center;">
+                            <div class="pagination" id="transactions-pagination">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>

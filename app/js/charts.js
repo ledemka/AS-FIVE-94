@@ -127,5 +127,47 @@ const Charts = {
                 });
             }, 200);
         });
+    },
+
+    /**
+     * Render a stacked horizontal bar for proportions
+     * @param {string} containerId
+     * @param {Array} data - [ { label, amount, percent, color } ]
+     */
+    renderStackedBar(containerId, data) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        let barsHtml = '';
+        let legendsHtml = '';
+
+        data.forEach(d => {
+            barsHtml += `<div class="stacked-bar-segment" style="width:0%; background:${d.color}" data-width="${d.percent}%" title="${d.label}: ${formatCurrency(d.amount)}"></div>`;
+            legendsHtml += `
+                <div class="stacked-bar-legend-item">
+                    <div class="stacked-bar-dot" style="background:${d.color}"></div>
+                    ${d.label} <span style="font-weight:700;">${d.percent}%</span>
+                </div>
+            `;
+        });
+
+        const html = `
+            <div class="stacked-bar-container">
+                ${barsHtml}
+            </div>
+            <div class="stacked-bar-legend">
+                ${legendsHtml}
+            </div>
+        `;
+
+        container.innerHTML = html;
+
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                container.querySelectorAll('.stacked-bar-segment').forEach(bar => {
+                    bar.style.width = bar.dataset.width;
+                });
+            }, 200);
+        });
     }
 };

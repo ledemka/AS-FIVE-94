@@ -83,6 +83,7 @@
     let currentCalMonth = new Date().getMonth();
     let currentCalYear = new Date().getFullYear();
     let SELECTED_MEMBERS = new Set();
+    let financesCurrentPage = 1;
 
     // ============================================
     // NAVIGATION
@@ -159,6 +160,30 @@
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         setTheme(!isDark);
     });
+
+    // Google Sheets Sync Button (Global)
+    const syncBtn = document.getElementById('sync-google-btn');
+    if (syncBtn) {
+        syncBtn.onclick = async () => {
+            const icon = syncBtn.querySelector('.material-icons-round');
+            syncBtn.disabled = true;
+            icon.classList.add('rotate');
+            
+            showToast('Synchronisation Google Sheets en cours...', 'info');
+            
+            try {
+                const result = await Api.post('/import/sync-google');
+                showToast(`Succès ! ${result.membersUpdated} membres, ${result.cotisationsAdded} cotisations synchronisées.`, 'success');
+                await DataSync.pullAll(); // Refresh data
+            } catch (err) {
+                console.error('Sync failed', err);
+                showToast('Échec de la synchronisation. Vérifiez la console.', 'error');
+            } finally {
+                syncBtn.disabled = false;
+                icon.classList.remove('rotate');
+            }
+        };
+    }
 
     // Init theme from localStorage or system preference
     const savedTheme = localStorage.getItem('sportflow-theme');
@@ -282,7 +307,23 @@
         // Update Dashboard Stats
         animateCounter('stat-members-count', membersCount);
         animateCounter('stat-sessions-count', sessionsThisMonth.length);
-        document.getElementById('stat-attendance-rate').textContent = avgAttendance + '%';
+        
+        // Funds Distribution (Dashboard)
+        const fundsDistribution = { 'Paypal': 0, 'HelloAsso': 0, 'Espece': 0 };
+        TRANSACTIONS.forEach(t => {
+            if (t.type === 'income') {
+                const method = t.paymentMethod === 'Espece' ? 'Espece' : (t.paymentMethod === 'HelloAsso' ? 'HelloAsso' : 'Paypal');
+                fundsDistribution[method] += Math.abs(t.amount);
+            }
+        });
+        const totalIncomeForDist = Object.values(fundsDistribution).reduce((a, b) => a + b, 0);
+        const fundsData = [
+            { label: 'Paypal', amount: fundsDistribution['Paypal'], percent: totalIncomeForDist > 0 ? Math.round(fundsDistribution['Paypal']/totalIncomeForDist*100) : 0, color: 'var(--accent-blue)' },
+            { label: 'HelloAsso', amount: fundsDistribution['HelloAsso'], percent: totalIncomeForDist > 0 ? Math.round(fundsDistribution['HelloAsso']/totalIncomeForDist*100) : 0, color: 'var(--accent-emerald)' },
+            { label: 'Espèces', amount: fundsDistribution['Espece'], percent: totalIncomeForDist > 0 ? Math.round(fundsDistribution['Espece']/totalIncomeForDist*100) : 0, color: 'var(--accent-amber)' }
+        ];
+        Charts.renderStackedBar('funds-distribution-chart', fundsData);
+
         document.getElementById('stat-winrate-value').textContent = winRate + '%';
         // Petit indicateur de régularisation dans le dashboard (optionnel)
         if (document.getElementById('stat-regularized-count')) {
@@ -432,7 +473,7 @@
 
         // Exporter la fonction de rendu pour y accéder depuis SportFlow
         SportFlow.renderMembersTable = function() {
-            const filtered = getFiltered();
+            const filtered = getFiltered().sort((a, b) => (a.lastName || '').localeCompare(b.lastName || '', 'fr'));
             const tbody = document.getElementById('members-table-body');
             tbody.innerHTML = filtered.map(m => {
                 const attClass = (m.attendance || 0) >= 80 ? 'high' : (m.attendance || 0) >= 50 ? 'medium' : 'low';
@@ -455,11 +496,12 @@
                         <td><span class="status-badge ${m.duesStatus}">${getDuesLabel(m.duesStatus)}</span></td>
                         <td>
                             <div class="attendance-bar">
-                                <div class="attendance-track"><div class="attendance-fill ${attClass}" style="width:${m.attendance || 0}%"></div></div>
-                                <span class="attendance-value">${m.attendance || 0}%</span>
+                                <div class="attendance-track">
+                                    <div class="attendance-fill" style="width:${Math.min(100, (m.totalPaid / 120) * 100)}%; background:${(m.totalPaid / 120) <= 0.3 ? 'var(--accent-rose)' : (m.totalPaid / 120) <= 0.7 ? 'var(--accent-amber)' : 'var(--accent-emerald)'}"></div>
+                                </div>
+                                <span class="attendance-value">${m.totalPaid || 0} / 120 €</span>
                             </div>
                         </td>
-                        <td>${formatDateFR(m.joinDate)}</td>
                         <td>
                             <div class="table-actions">
                                 <button class="table-action-btn" title="Voir" onclick="SportFlow.viewMember(${m.id})"><span class="material-icons-round">visibility</span></button>
@@ -476,10 +518,96 @@
 
         const render = SportFlow.renderMembersTable;
 
-        searchInput.addEventListener('input', () => { SELECTED_MEMBERS.clear(); SportFlow.updateBulkBar(); render(); });
-        statusFilter.addEventListener('change', () => { SELECTED_MEMBERS.clear(); SportFlow.updateBulkBar(); render(); });
-        registrationFilter.addEventListener('change', () => { SELECTED_MEMBERS.clear(); SportFlow.updateBulkBar(); render(); });
-        duesFilter.addEventListener('change', () => { SELECTED_MEMBERS.clear(); SportFlow.updateBulkBar(); render(); });
+        // Sort state: { field: 'name'|'dues'|'paid', dir: 'asc'|'desc' }
+        let currentSort = { field: 'paid', dir: 'asc' };
+
+        function updateSortIcons() {
+            document.querySelectorAll('#members-table th .sort-icon').forEach(icon => {
+                icon.textContent = 'unfold_more';
+                icon.style.opacity = '0.4';
+            });
+            const activeHeader = document.getElementById('sort-by-paid');
+            if (activeHeader) {
+                const icon = activeHeader.querySelector('.sort-icon');
+                icon.textContent = currentSort.dir === 'asc' ? 'arrow_upward' : 'arrow_downward';
+                icon.style.opacity = '1';
+            }
+        }
+
+        // Override renderMembersTable to apply sort
+        const originalRender = SportFlow.renderMembersTable;
+        SportFlow.renderMembersTable = function() {
+            const filtered = getFiltered();
+            // Apply sort
+            filtered.sort((a, b) => {
+                let cmp = 0;
+                if (currentSort.field === 'paid') {
+                    cmp = (a.totalPaid || 0) - (b.totalPaid || 0);
+                } else {
+                    cmp = (a.lastName || '').localeCompare(b.lastName || '', 'fr');
+                }
+                return currentSort.dir === 'asc' ? cmp : -cmp;
+            });
+
+            const tbody = document.getElementById('members-table-body');
+            tbody.innerHTML = filtered.map(m => {
+                const attClass = (m.attendance || 0) >= 80 ? 'high' : (m.attendance || 0) >= 50 ? 'medium' : 'low';
+                const isReg = m.registrationStatus === 'registered' && m.duesStatus === 'paid';
+                const isChecked = SELECTED_MEMBERS.has(m.id) ? 'checked' : '';
+                return `
+                    <tr class="${isChecked ? 'selected' : ''}">
+                        <td><input type="checkbox" class="member-checkbox" ${isChecked} onchange="SportFlow.toggleMember(${m.id})"></td>
+                        <td>
+                            <div class="table-member">
+                                <div class="table-member-avatar" style="background:${getAvatarColor(m.id)}">${getInitials(m.firstName, m.lastName)}</div>
+                                <div class="table-member-info">
+                                    <span class="table-member-name">${m.firstName} ${m.lastName}</span>
+                                    <span class="table-member-email">${m.email}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span class="status-badge ${isReg ? 'success' : 'pending'}">${getStatusLabel(m)}</span></td>
+                        <td><span class="status-badge ${m.registrationStatus === 'registered' ? 'active' : 'inactive'}">${getRegistrationLabel(m.registrationStatus)}</span></td>
+                        <td><span class="status-badge ${m.duesStatus}">${getDuesLabel(m.duesStatus)}</span></td>
+                        <td>
+                            <div class="attendance-bar">
+                                <div class="attendance-track">
+                                    <div class="attendance-fill" style="width:${Math.min(100, (m.totalPaid / 120) * 100)}%; background:${(m.totalPaid / 120) <= 0.3 ? 'var(--accent-rose)' : (m.totalPaid / 120) <= 0.7 ? 'var(--accent-amber)' : 'var(--accent-emerald)'}"></div>
+                                </div>
+                                <span class="attendance-value">${m.totalPaid || 0} / 120 €</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="table-actions">
+                                <button class="table-action-btn" title="Voir" onclick="SportFlow.viewMember(${m.id})"><span class="material-icons-round">visibility</span></button>
+                                <button class="table-action-btn" title="Modifier" onclick="SportFlow.editMember(${m.id})"><span class="material-icons-round">edit</span></button>
+                                <button class="table-action-btn" title="Plus" onclick="SportFlow.showMemberActions(${m.id}, event)"><span class="material-icons-round">more_horiz</span></button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('members-count-info').textContent = `${filtered.length} membre${filtered.length > 1 ? 's' : ''}`;
+            updateSortIcons();
+        };
+
+        function toggleSort(field) {
+            if (currentSort.field === field) {
+                currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.field = field;
+                currentSort.dir = 'asc';
+            }
+            SportFlow.renderMembersTable();
+        }
+
+        document.getElementById('sort-by-paid').onclick = () => toggleSort('paid');
+
+        searchInput.addEventListener('input', () => { SELECTED_MEMBERS.clear(); SportFlow.updateBulkBar(); SportFlow.renderMembersTable(); });
+        statusFilter.addEventListener('change', () => { SELECTED_MEMBERS.clear(); SportFlow.updateBulkBar(); SportFlow.renderMembersTable(); });
+        registrationFilter.addEventListener('change', () => { SELECTED_MEMBERS.clear(); SportFlow.updateBulkBar(); SportFlow.renderMembersTable(); });
+        duesFilter.addEventListener('change', () => { SELECTED_MEMBERS.clear(); SportFlow.updateBulkBar(); SportFlow.renderMembersTable(); });
 
         document.getElementById('select-all-members').onclick = (e) => {
             const isChecked = e.target.checked;
@@ -499,6 +627,9 @@
             openModal('Ajouter un membre', getMemberFormHTML());
             setupMemberForm();
         };
+
+        // Sync Google Sheets button
+        const syncBtn = document.getElementById('sync-google-btn');
     }
 
     function getMemberFormHTML(member = null) {
@@ -939,108 +1070,141 @@
 
     // ---- Finances ----
     function renderFinances() {
-        const income = TRANSACTIONS.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-        const expenses = Math.abs(TRANSACTIONS.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0));
+        const filteredTransactions = TRANSACTIONS;
+        const income = filteredTransactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+        const expenses = Math.abs(filteredTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0));
         const balance = income - expenses;
-        const pendingDues = MEMBERS.filter(m => m.dues !== 'paid').length * 250;
+        
+        // Members stats filter for pending dues
+        const pendingDues = MEMBERS.filter(m => m.duesStatus !== 'paid').length * 250;
 
         document.getElementById('fin-income-value').textContent = formatCurrency(income);
         document.getElementById('fin-expenses-value').textContent = formatCurrency(expenses);
         document.getElementById('fin-balance-value').textContent = formatCurrency(balance);
         document.getElementById('fin-pending-value').textContent = formatCurrency(pendingDues);
 
+        // Payment type summary
+        const summaryRow = document.getElementById('finance-payment-summary-row');
+        if (summaryRow) {
+            // Display properties are now handled by CSS class 'finance-compact-row'
+            summaryRow.style.display = '';
+            summaryRow.style.gridTemplateColumns = '';
+            summaryRow.style.gap = '';
+            
+            const types = ['HelloAsso', 'Paypal', 'Espece'];
+            summaryRow.innerHTML = types.map(type => {
+                const typeIncome = TRANSACTIONS.filter(t => t.type === 'income' && t.paymentMethod === type).reduce((s, t) => s + Math.abs(t.amount), 0);
+                const icon = type === 'HelloAsso' ? 'link' : type === 'Paypal' ? 'account_balance_wallet' : 'payments';
+                const label = type === 'Espece' ? 'Espèces' : type;
+                const colorVar = type === 'HelloAsso' ? 'emerald' : type === 'Paypal' ? 'blue' : 'amber';
+                return `
+                    <div class="stat-card" style="padding:15px;">
+                        <div class="stat-icon ${colorVar}" style="background:var(--bg-tertiary); color:var(--accent-${colorVar})">
+                            <span class="material-icons-round">${icon}</span>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" style="font-size:1.1rem">${formatCurrency(typeIncome)}</span>
+                            <span class="stat-label">${label}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Dynamic Expense Breakdown
+        const expensesByMotif = {};
+        let totalExpensesCalc = 0;
+
+        TRANSACTIONS.forEach(t => {
+            if (t.type === 'expense') {
+                const motif = t.description || 'Autre';
+                const absAmount = Math.abs(t.amount);
+                expensesByMotif[motif] = (expensesByMotif[motif] || 0) + absAmount;
+                totalExpensesCalc += absAmount;
+            }
+        });
+
+        const breakdownColors = [
+            'var(--accent-blue)',
+            'var(--accent-purple)',
+            'var(--accent-amber)',
+            'var(--accent-emerald)',
+            'var(--accent-rose)',
+            'var(--accent-indigo)'
+        ];
+
+        const dynamicExpenseData = Object.entries(expensesByMotif)
+            .map(([label, amount]) => ({
+                label,
+                amount,
+                percent: totalExpensesCalc > 0 ? Math.round((amount / totalExpensesCalc) * 100) : 0,
+            }))
+            .sort((a, b) => b.amount - a.amount)
+            .map((item, index) => ({ ...item, color: breakdownColors[index % breakdownColors.length] }));
+
         // Charts
         Charts.renderFinanceChart('finance-chart', MONTHLY_FINANCES);
-        Charts.renderExpenseBreakdown('expense-breakdown', EXPENSE_BREAKDOWN);
+        Charts.renderExpenseBreakdown('expense-breakdown', dynamicExpenseData);
 
-        // Transactions table
+        // Funds Distribution (Finances Page)
+        const fundsDistribution = { 'Paypal': 0, 'HelloAsso': 0, 'Espece': 0 };
+        TRANSACTIONS.forEach(t => {
+            if (t.type === 'income') {
+                const method = t.paymentMethod === 'Espece' ? 'Espece' : (t.paymentMethod === 'HelloAsso' ? 'HelloAsso' : 'Paypal');
+                fundsDistribution[method] += Math.abs(t.amount);
+            }
+        });
+        const totalIncomeForDist = Object.values(fundsDistribution).reduce((a, b) => a + b, 0);
+        const fundsData = [
+            { label: 'Paypal', amount: fundsDistribution['Paypal'], percent: totalIncomeForDist > 0 ? Math.round(fundsDistribution['Paypal']/totalIncomeForDist*100) : 0, color: 'var(--accent-blue)' },
+            { label: 'HelloAsso', amount: fundsDistribution['HelloAsso'], percent: totalIncomeForDist > 0 ? Math.round(fundsDistribution['HelloAsso']/totalIncomeForDist*100) : 0, color: 'var(--accent-emerald)' },
+            { label: 'Espèces', amount: fundsDistribution['Espece'], percent: totalIncomeForDist > 0 ? Math.round(fundsDistribution['Espece']/totalIncomeForDist*100) : 0, color: 'var(--accent-amber)' }
+        ];
+        Charts.renderStackedBar('finances-page-funds-distribution-chart', fundsData);
+
+        // Transactions table with Sort & Pagination
+        const sortedTransactions = [...filteredTransactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        const itemsPerPage = 15;
+        const totalPages = Math.ceil(sortedTransactions.length / itemsPerPage) || 1;
+        if (financesCurrentPage > totalPages) financesCurrentPage = totalPages;
+        const startIndex = (financesCurrentPage - 1) * itemsPerPage;
+        const paginatedTransactions = sortedTransactions.slice(startIndex, startIndex + itemsPerPage);
+
         const tbody = document.getElementById('transactions-table-body');
-        tbody.innerHTML = TRANSACTIONS.sort((a, b) => b.date.localeCompare(a.date)).map(t => `
+        tbody.innerHTML = paginatedTransactions.map(t => {
+            const isIncome = t.type === 'income';
+            const color = isIncome ? 'var(--accent-emerald)' : 'var(--accent-rose)';
+            const sign = isIncome ? '+' : '-';
+            const absAmount = Math.abs(t.amount);
+            return `
             <tr>
                 <td>${formatDateFR(t.date)}</td>
                 <td>${t.description}</td>
                 <td>${t.category}</td>
-                <td class="transaction-amount ${t.amount >= 0 ? 'positive' : 'negative'}">
-                    ${t.amount >= 0 ? '+' : ''}${formatCurrency(t.amount)}
+                <td class="transaction-amount" style="color:${color}; font-weight:600;">
+                    ${sign}${formatCurrency(absAmount)}
                 </td>
                 <td>
                     <span class="transaction-type ${t.type}">
-                        <span class="material-icons-round" style="font-size:16px">${t.type === 'income' ? 'arrow_downward' : 'arrow_upward'}</span>
-                        ${t.type === 'income' ? 'Recette' : 'Dépense'}
+                        <span class="material-icons-round" style="font-size:16px">${isIncome ? 'arrow_upward' : 'arrow_downward'}</span>
+                        ${isIncome ? 'Recette' : 'Dépense'}
                     </span>
                 </td>
             </tr>
-        `).join('');
+        `}).join('');
 
-        // Add transaction button
-        document.getElementById('add-transaction-btn').onclick = () => {
-            openModal('Nouvelle transaction', getTransactionFormHTML());
-            setupTransactionForm();
-        };
-    }
-
-    function getTransactionFormHTML() {
-        return `
-            <form id="transaction-form" class="modal-form">
-                <div class="form-group">
-                    <label for="tf-desc">Description</label>
-                    <input type="text" id="tf-desc" class="form-input" placeholder="Ex: Cotisation — Nom Prénom" required>
-                </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div class="form-group">
-                        <label for="tf-amount">Montant (€)</label>
-                        <input type="number" id="tf-amount" class="form-input" step="0.01" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="tf-type">Type</label>
-                        <select id="tf-type" class="form-select">
-                            <option value="income">Recette</option>
-                            <option value="expense">Dépense</option>
-                        </select>
-                    </div>
-                </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div class="form-group">
-                        <label for="tf-category">Catégorie</label>
-                        <input type="text" id="tf-category" class="form-input" placeholder="Ex: Cotisation">
-                    </div>
-                    <div class="form-group">
-                        <label for="tf-date">Date</label>
-                        <input type="date" id="tf-date" class="form-input" value="${new Date().toISOString().slice(0, 10)}" required>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:8px;">
-                    <span class="material-icons-round">add</span>
-                    Ajouter
-                </button>
-            </form>
-        `;
-    }
-
-    function setupTransactionForm() {
-        const form = document.getElementById('transaction-form');
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const type = document.getElementById('tf-type').value;
-            const amount = parseFloat(document.getElementById('tf-amount').value);
-            
-            const transactionData = {
-                date: document.getElementById('tf-date').value,
-                description: document.getElementById('tf-desc').value,
-                category: document.getElementById('tf-category').value || 'Autre',
-                amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount),
-                type: type
-            };
-
-            try {
-                await Api.post('/finances', transactionData);
-                closeModal();
-                await DataSync.pullAll();
-                showToast('Transaction ajoutée', 'success');
-            } catch (err) {
-                console.error(err);
+        // Render Pagination
+        const paginationEl = document.getElementById('transactions-pagination');
+        if (paginationEl) {
+            let pagHTML = '';
+            for(let i = 1; i <= totalPages; i++) {
+                pagHTML += `<button class="pagination-btn ${i === financesCurrentPage ? 'active' : ''}" onclick="SportFlow.goToFinancesPage(${i})">${i}</button>`;
             }
-        });
+            paginationEl.innerHTML = pagHTML;
+        }
+
+        // Remove transaction listeners
     }
 
     // ---- Communications ----
@@ -1171,6 +1335,10 @@
                     <button class="btn btn-ghost" style="justify-content:flex-start; font-size:0.8rem; padding:8px 12px; height:auto;" onclick="SportFlow.showCommunicationModal([${m.id}], 'Email')">
                         <span class="material-icons-round" style="color:#2563eb; font-size:18px;">mail</span> Email
                     </button>
+                    <hr style="border:0; border-top:1px solid var(--border-color); margin:4px 0;">
+                    <button class="btn btn-ghost" style="justify-content:flex-start; font-size:0.8rem; padding:8px 12px; height:auto; color:var(--accent-rose);" onclick="SportFlow.deleteMember(${m.id})">
+                        <span class="material-icons-round" style="font-size:18px;">delete</span> Supprimer le membre
+                    </button>
                 </div>
             `;
             openModal(`Actions : ${m.firstName}`, menuHTML);
@@ -1281,6 +1449,36 @@
             if (!e) return;
             openModal(`Modifier — ${e.title}`, getEventFormHTML(e));
             setupEventForm(id);
+        },
+        async deleteMember(id) {
+            console.log('Tentative de suppression du membre ID:', id);
+            const m = MEMBERS.find(m => m.id === id);
+            if (!m) {
+                console.error('Membre non trouvé dans MEMBERS');
+                return;
+            }
+            
+            if (confirm(`Êtes-vous sûr de vouloir supprimer ${m.firstName} ${m.lastName} ? Cette action est irréversible.`)) {
+                try {
+                    console.log('Envoi de la requête DELETE à:', `${API_BASE}/members/${id}`);
+                    const response = await fetch(`${API_BASE}/members/${id}`, {
+                        method: 'DELETE'
+                    });
+                    if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
+                    
+                    showToast('Membre supprimé', 'success');
+                    closeModal();
+                    await DataSync.pullAll();
+                    console.log('Suppression réussie et données rafraîchies');
+                } catch (err) {
+                    console.error('Erreur lors de la suppression:', err);
+                    showToast(err.message, 'error');
+                }
+            }
+        },
+        goToFinancesPage(page) {
+            financesCurrentPage = page;
+            renderPage('finances');
         }
     };
 

@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from 'typeorm';
+import { Transaction } from '../finances/finances.entity';
 
 @Entity('members')
 export class Member {
@@ -17,6 +18,18 @@ export class Member {
   @Column({ nullable: true })
   phone: string;
 
+  @Column({ nullable: true })
+  externalId: string; // Adherent ID from Excel (e.g., A001)
+
+  @Column({ nullable: true })
+  paymentMethod: string; // HelloAsso, Paypal, Espece
+
+  @Column({ default: false })
+  registrationDues: boolean; // Frais d'inscription payés
+
+  @Column({ nullable: true })
+  duesFrequency: string; // Mensuel, Trimestriel, Annuel
+
   @Column({ default: 'senior' })
   category: string;
 
@@ -31,6 +44,9 @@ export class Member {
 
   @CreateDateColumn()
   joinDate: Date;
+
+  @OneToMany(() => Transaction, (transaction) => transaction.member)
+  transactions: Transaction[];
 
   // Le statut global est calculé : Régularisé si Inscrit ET Cotisation Payée
   get isRegularized(): boolean {

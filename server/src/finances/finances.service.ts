@@ -34,4 +34,8 @@ export class FinancesService {
       balance: income - expenses,
     };
   }
+
+  async remove(id: number): Promise<void> {
+    await this.financesRepository.delete(id);
+  }
 }
