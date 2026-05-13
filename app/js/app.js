@@ -409,10 +409,6 @@
                 <span class="finance-row-label"><span class="finance-dot expense"></span>Dépenses</span>
                 <span class="finance-row-value" style="color:var(--accent-rose)">${formatCurrency(totalExpenses)}</span>
             </div>
-            <div class="finance-row">
-                <span class="finance-row-label"><span class="finance-dot pending"></span>Cotisations en attente</span>
-                <span class="finance-row-value" style="color:var(--accent-amber)">${formatCurrency(pendingDues)}</span>
-            </div>
             <div class="finance-progress-bar">
                 <div class="finance-progress-fill" style="width:0%; background:var(--gradient-emerald)" data-width="${Math.round((totalIncome / ((totalIncome + totalExpenses) || 1)) * 100)}%"></div>
             </div>
@@ -1081,7 +1077,6 @@
         document.getElementById('fin-income-value').textContent = formatCurrency(income);
         document.getElementById('fin-expenses-value').textContent = formatCurrency(expenses);
         document.getElementById('fin-balance-value').textContent = formatCurrency(balance);
-        document.getElementById('fin-pending-value').textContent = formatCurrency(pendingDues);
 
         // Payment type summary
         const summaryRow = document.getElementById('finance-payment-summary-row');

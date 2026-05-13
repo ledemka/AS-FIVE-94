@@ -39,6 +39,9 @@ export class Member {
   @Column({ default: 'unpaid' }) // paid, unpaid, pending
   duesStatus: string;
 
+  @Column({ type: 'float', default: 0 })
+  totalPaid: number;
+
   @Column({ default: 0 })
   attendance: number;
 

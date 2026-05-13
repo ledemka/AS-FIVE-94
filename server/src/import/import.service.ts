@@ -33,13 +33,17 @@ export class ImportService {
     // Store member map for cross-tab referencing
     const memberMap = new Map<string, number>(); // adherentId -> memberDbId
 
+    // PHASE 0: Clear legacy Cotisation transactions to ensure clean state
+    await this.transactionsRepository.delete({ category: 'Cotisation' });
+    this.logger.log('Legacy Cotisation transactions cleared.');
+
     // PHASE 1: Sync Members from "Suivi adhesion"
     results.membersUpdated = await this.syncMembersTab(spreadsheetId, memberMap);
 
-    // PHASE 2: Sync Dues from "Suivi de cotisation"
+    // PHASE 2: Sync individual monthly payments from "Suivi de cotisation"
     results.cotisationsAdded = await this.syncCotisationsTab(spreadsheetId, memberMap);
 
-    // PHASE 3: Sync General Transactions from "Flux monétaires"
+    // PHASE 3: Sync Expenditures from "Flux monétaires"
     results.transactionsAdded = await this.syncFluxTab(spreadsheetId);
 
     this.logger.log('Synchronization complete.');
@@ -66,6 +70,8 @@ export class ImportService {
       const duesStatusRaw = row[7]?.toString();
       const paymentMethod = row[8]?.toString() || 'Espece';
       
+      const totalPaid = this.parseCurrency(duesStatusRaw);
+      
       if (!lastName && !firstName) {
         if (adherentId || row.some(cell => cell && cell.toString().trim())) {
           this.logger.warn(`Skipping row ${i + 2}: Both names are empty. Content: ${JSON.stringify(row)}`);
@@ -73,9 +79,16 @@ export class ImportService {
         continue;
       }
 
-      let member = await this.membersRepository.findOne({
-        where: { firstName, lastName }
-      });
+      let member = null;
+      if (adherentId) {
+        member = await this.membersRepository.findOne({ where: { externalId: adherentId } });
+      }
+      
+      if (!member) {
+        member = await this.membersRepository.findOne({
+          where: { firstName, lastName }
+        });
+      }
 
       const memberData: Partial<Member> = {
         externalId: adherentId,
@@ -85,9 +98,14 @@ export class ImportService {
         registrationStatus: regDuesValue === 'OUI' ? 'registered' : 'unregistered',
         duesFrequency: duesFreq,
         paymentMethod,
-        duesStatus: this.mapDuesStatus(duesStatusRaw),
+        totalPaid: totalPaid,
+        duesStatus: totalPaid >= 120 ? 'paid' : 'pending',
         email: member?.email || `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
       };
+
+      if (['RUSSEL', 'CHRISTOPHER', 'PATERSON'].some(n => firstName?.toUpperCase().includes(n) || lastName?.toUpperCase().includes(n))) {
+          this.logger.log(`DEBUG: Syncing member ${firstName} ${lastName} (ID: ${adherentId}). totalPaid from sheet: ${totalPaid}`);
+      }
 
       if (member) {
         Object.assign(member, memberData);
@@ -125,7 +143,7 @@ export class ImportService {
       for (let i = 2; i < row.length; i++) {
         const header = headerRow[i]?.toString();
         // Check if header is a month (e.g. "Septembre 25")
-        if (header && /^[A-Z][a-z]+ \d{2}$/.test(header)) {
+        if (header && /^[A-Z][a-zàâçéèêëîïôûù\-\s]+ \d{2}$/i.test(header)) {
           const amountStr = row[i]?.toString();
           const method = row[i + 1]?.toString(); // Usually method is the next column
           const amount = this.parseCurrency(amountStr);

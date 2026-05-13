@@ -13,17 +13,11 @@ export class MembersService {
   ) {}
 
   async findAll(): Promise<any[]> {
-    const members = await this.membersRepository.find({ relations: ['transactions'] });
+    const members = await this.membersRepository.find();
     return members.map(m => {
-      const totalPaid = m.transactions
-        ? m.transactions
-            .filter(t => t.category === 'Cotisation' && t.type === 'income')
-            .reduce((sum, t) => sum + Number(t.amount), 0)
-        : 0;
-      const computedDuesStatus = totalPaid >= 120 ? 'paid' : 'pending';
+      const computedDuesStatus = m.totalPaid >= 120 ? 'paid' : 'pending';
       return {
         ...m,
-        totalPaid,
         duesStatus: computedDuesStatus,
         isRegularized: m.registrationStatus === 'registered' && computedDuesStatus === 'paid'
       };
@@ -31,20 +25,11 @@ export class MembersService {
   }
 
   async findOne(id: number): Promise<any> {
-    const member = await this.membersRepository.findOne({ 
-      where: { id },
-      relations: ['transactions']
-    });
+    const member = await this.membersRepository.findOneBy({ id });
     if (!member) throw new NotFoundException(`Member with ID ${id} not found`);
-    const totalPaid = member.transactions
-      ? member.transactions
-          .filter(t => t.category === 'Cotisation' && t.type === 'income')
-          .reduce((sum, t) => sum + Number(t.amount), 0)
-      : 0;
-    const computedDuesStatus = totalPaid >= 120 ? 'paid' : 'pending';
+    const computedDuesStatus = member.totalPaid >= 120 ? 'paid' : 'pending';
     return {
       ...member,
-      totalPaid,
       duesStatus: computedDuesStatus,
       isRegularized: member.registrationStatus === 'registered' && computedDuesStatus === 'paid'
     };
